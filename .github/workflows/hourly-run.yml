@@ -1,0 +1,28 @@
+name: Hourly Lock Code Generator
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # every hour UTC
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          TTLOCK_CLIENT_ID: ${{ secrets.TTLOCK_CLIENT_ID }}
+          TTLOCK_ACCESS_TOKEN: ${{ secrets.TTLOCK_ACCESS_TOKEN }}
+        run: |
+          python multi_property_lock_codes.py
