@@ -1,0 +1,10 @@
+{
+  "access_token": "2a4db1dd63da0552294f52000710004f",
+  "refresh_token": "f198b2b3203b3d526bf86dddfc65473d",
+  "uid": 17467030,
+  "openid": 1015231099,
+  "scope": "user,key,room",
+  "token_type": "Bearer",
+  "expires_in": 2661884,
+  "expires_at": 1764155097
+}
