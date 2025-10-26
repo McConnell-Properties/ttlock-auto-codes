@@ -1,12 +1,16 @@
 # Script to process bookings and create TTLock codes
-# This script reads bookings.csv and uses the create_lock_code_simple helper
-# from multi_property_lock_codes to create door codes. It also logs actions.
-
+# Reads bookings.csv, sets TTLock credentials from environment, and logs actions.
 import csv
+import os
 from datetime import datetime
-from multi_property_lock_codes import create_lock_code_simple
+import multi_property_lock_codes
 
-if __name__ == "__main__":
+# Assign TTLock credentials from environment to the helper module
+multi_property_lock_codes.CLIENT_ID = os.getenv("TTLOCK_CLIENT_ID")
+multi_property_lock_codes.ACCESS_TOKEN = os.getenv("TTLOCK_ACCESS_TOKEN")
+
+
+def main():
     try:
         with open("bookings.csv", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -33,21 +37,25 @@ if __name__ == "__main__":
                         continue
 
                     if not lock_id_str:
-                        print(f"⚠️ No lock_id for booking {booking_id}; skipping")
-                        continue
-                    if start is None or end is None:
-                        print(f"⚠️ Missing start or end date for booking {booking_id}; skipping")
+                        print(f"⚠️ Skipping booking {booking_id} due to missing Lock ID")
                         continue
 
-                    print(f"🔐 Creating code for {name} (booking {booking_id}) with code {code}")
+                    if not code:
+                        print(f"⚠️ Skipping booking {booking_id} due to missing code")
+                        continue
+
+                    # Convert to milliseconds timestamps if start and end exist
                     try:
-                        # Convert lock_id to int if possible
-                        try:
-                            lock_id = int(lock_id_str)
-                        except:
-                            lock_id = lock_id_str
-                        create_lock_code_simple(lock_id, code, name, start, end, "Room", booking_id)
+                        start_ms = int(start.timestamp() * 1000) if start else None
+                        end_ms = int(end.timestamp() * 1000) if end else None
+                        # Call helper to create lock code
+                        result = multi_property_lock_codes.create_lock_code_simple(int(lock_id_str), code, start_ms, end_ms)
+                        print(f"✅ Processed booking {booking_id} for {name}: {result}")
                     except Exception as e:
-                        print(f"⚠️ Error creating code for booking {booking_id}: {e}")
+                        print(f"❌ Failed to create code for booking {booking_id}: {e}")
     except FileNotFoundError:
-        print("ℹ️ bookings.csv not found in repository")
+        print("⚠️ bookings.csv file not found")
+
+
+if __name__ == "__main__":
+    main()
