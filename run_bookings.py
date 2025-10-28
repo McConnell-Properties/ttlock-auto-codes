@@ -2,6 +2,7 @@
 # Reads bookings.csv, sets TTLock credentials from environment, and logs actions.
 import csv
 import os
+import re
 from datetime import datetime
 import multi_property_lock_codes
 
@@ -31,6 +32,17 @@ def main():
                     # NEW: Read property_location and door_number from CSV
                     property_location = row.get("property_location") or row.get("Property Location") or ""
                     door_number = row.get("door_number") or row.get("Door Number") or ""
+                    
+                    # FALLBACK: If code is missing, extract first 4 digits from reservation_code or summary field
+                    if not code:
+                        # Try to get summary field as alternative to reservation_code
+                        reference = booking_id or row.get("summary") or row.get("Summary") or ""
+                        if reference:
+                            # Extract only digits from the reference
+                            digits = re.sub(r'\D', '', reference)
+                            if len(digits) >= 4:
+                                code = digits[:4]
+                                print(f"ℹ️ Generated code '{code}' from reference '{reference}'")
                     
                     print(f"\n📋 Processing booking {booking_id} for {name}")
                     print(f"   Property: {property_location}, Room: {door_number}")
