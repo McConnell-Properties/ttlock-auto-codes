@@ -48,8 +48,10 @@ def main():
                     try:
                         start_ms = int(start.timestamp() * 1000) if start else None
                         end_ms = int(end.timestamp() * 1000) if end else None
-                        # Call helper to create lock code
-                        result = multi_property_lock_codes.create_lock_code_simple(int(lock_id_str), code, start_ms, end_ms)
+                        # Call helper to create lock code with all required parameters
+                        result = multi_property_lock_codes.create_lock_code_simple(
+                            int(lock_id_str), code, name, start_ms, end_ms, "Room", booking_id
+                        )
                         print(f"✅ Processed booking {booking_id} for {name}: {result}")
                     except Exception as e:
                         print(f"❌ Failed to create code for booking {booking_id}: {e}")
