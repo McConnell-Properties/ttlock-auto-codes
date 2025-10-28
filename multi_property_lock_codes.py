@@ -8,10 +8,31 @@ import json
 CLIENT_ID = None
 ACCESS_TOKEN = None
 CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'  # required for refresh flow
-
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
 TOKEN_FILE = 'ttlock_token.json'
+
+# Property configuration: maps property_location to lock IDs
+# Structure: {property_name: {"front_door": lock_id, "room_1": lock_id, "room_2": lock_id, ...}}
+PROPERTIES = {
+    "Streatham": {
+        "front_door": None,  # Configure with actual lock ID if front door exists
+        "1": None,  # Room 1 lock ID
+        "2": None,  # Room 2 lock ID
+        "3": None,  # Room 3 lock ID
+    },
+    "Norwich": {
+        "front_door": None,  # Configure with actual lock ID if front door exists
+        "1": None,  # Room 1 lock ID
+        "2": None,  # Room 2 lock ID
+    },
+    "Tooting": {
+        "front_door": None,  # Configure with actual lock ID if front door exists
+        "1": None,  # Room 1 lock ID
+        "2": None,  # Room 2 lock ID
+        "3": None,  # Room 3 lock ID
+    },
+}
 
 def _load_token():
     if os.path.exists(TOKEN_FILE):
@@ -103,8 +124,9 @@ def create_lock_code_simple(lock_id, code, name, start, end, code_type="Room", b
         "addType": 2,                      # cloud/app
         "date": int(time.time() * 1000),
     }
-
+    
     print(f"📤 Creating {code_type} code '{code}' for {name} (Lock ID: {lock_id})")
+    
     try:
         api_res = _ttlock_add_keyboard_pwd(payload)
         try:
@@ -112,7 +134,7 @@ def create_lock_code_simple(lock_id, code, name, start, end, code_type="Room", b
         except json.JSONDecodeError:
             print("❌ Invalid JSON response from TTLock")
             return False
-
+        
         # If token invalid, refresh and retry once
         if result.get("errcode") in (10003, 10004, -2010):  # invalid token / invalid grant
             print("🔁 Token invalid; refreshing and retrying…")
@@ -128,7 +150,7 @@ def create_lock_code_simple(lock_id, code, name, start, end, code_type="Room", b
             except Exception as e:
                 print(f"❌ Refresh failed: {e}")
                 return False
-
+        
         if result.get("errcode") == 0:
             print(f"✅ {code_type} code {code} created successfully")
             return True
@@ -141,7 +163,7 @@ def create_lock_code_simple(lock_id, code, name, start, end, code_type="Room", b
         else:
             print(f"✅ {code_type} code {code} created successfully")
             return True
-
+    
     except requests.exceptions.Timeout:
         print("❌ TTLock API timeout")
         return False
