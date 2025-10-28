@@ -1,5 +1,6 @@
 # Script to process bookings and create TTLock codes
 # Reads bookings.csv, sets TTLock credentials from environment, and logs actions.
+
 import csv
 import os
 import re
@@ -60,14 +61,6 @@ def main():
                         print(f"⚠️ Skipping booking {booking_id} due to missing property_location")
                         continue
                     
-                    if not door_number:
-                        print(f"⚠️ Skipping booking {booking_id} due to missing door_number")
-                        continue
-                    
-                    if not code:
-                        print(f"⚠️ Skipping booking {booking_id} due to missing code")
-                        continue
-                    
                     # Match property_location to PROPERTIES dict
                     if property_location not in multi_property_lock_codes.PROPERTIES:
                         print(f"⚠️ Unknown property location '{property_location}' - not in PROPERTIES dict")
@@ -84,9 +77,10 @@ def main():
                         any_success = False
                         
                         # 1. Attempt to create code for FRONT DOOR (if configured)
-                        front_door_lock_id = property_config.get("front_door")
+                        front_door_lock_id = property_config.get("FRONT_DOOR_LOCK_ID")
                         if front_door_lock_id:
                             print(f"🚪 Attempting front door code for {property_location}...")
+                            print(f"   🔧 DEBUG: Using FRONT_DOOR_LOCK_ID = {front_door_lock_id}")
                             result = multi_property_lock_codes.create_lock_code_simple(
                                 front_door_lock_id, code, name, start_ms, end_ms, 
                                 f"Front Door ({property_location})", booking_id
@@ -100,9 +94,10 @@ def main():
                             print(f"ℹ️ No front door configured for {property_location}")
                         
                         # 2. Attempt to create code for ROOM LOCK (if present)
-                        room_lock_id = property_config.get(door_number)
+                        room_lock_id = property_config.get("ROOM_LOCK_IDS", {}).get(door_number)
                         if room_lock_id:
                             print(f"🚪 Attempting room {door_number} code for {property_location}...")
+                            print(f"   🔧 DEBUG: Using room lock ID = {room_lock_id} for {door_number}")
                             result = multi_property_lock_codes.create_lock_code_simple(
                                 room_lock_id, code, name, start_ms, end_ms, 
                                 f"Room {door_number} ({property_location})", booking_id
@@ -114,6 +109,7 @@ def main():
                                 print(f"❌ Failed to create room {door_number} code (Lock ID: {room_lock_id})")
                         else:
                             print(f"⚠️ No lock configured for room {door_number} at {property_location}")
+                            print(f"   🔧 DEBUG: Available rooms in config: {list(property_config.get('ROOM_LOCK_IDS', {}).keys())}")
                         
                         # Summary for this booking
                         if any_success:
