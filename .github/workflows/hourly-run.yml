@@ -1,9 +1,9 @@
 name: Hourly Lock Code Generator
 on:
   schedule:
-    - cron: "0 * * * *" # every hour UTC
+    - cron: "*/10 * * * *"
+      # every 10 minutes UTC
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
