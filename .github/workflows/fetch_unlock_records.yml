@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          token: ${{ github.token }}
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -24,4 +26,4 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add unlock_records.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update unlock_records.csv" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update unlock_records.csv" && git push origin main)
