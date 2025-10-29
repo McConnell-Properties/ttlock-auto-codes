@@ -84,7 +84,8 @@ def fetch_unlock_records(location, lock_id, attempt=1):
     print(f"\n[DEBUG] ===== FETCH ATTEMPT {attempt} for {location} (Lock ID {lock_id}) =====")
     
     try:
-        timestamp = int(time.time())
+        # TTLock API expects timestamp in MILLISECONDS, not seconds
+        timestamp = int(time.time() * 1000)
         payload = {
             'clientId': CLIENT_ID,
             'accessToken': current_access_token,
@@ -94,7 +95,7 @@ def fetch_unlock_records(location, lock_id, attempt=1):
             'pageSize': 100,
         }
         
-        print(f"[DEBUG] Request payload: clientId={CLIENT_ID}, accessToken={current_access_token[:20]}..., lockId={lock_id}")
+        print(f"[DEBUG] Request payload: clientId={CLIENT_ID}, accessToken={current_access_token[:20]}..., lockId={lock_id}, date={timestamp}")
         print(f"[DEBUG] Sending POST request to: {API_BASE}")
         
         response = requests.post(API_BASE, data=payload, timeout=15)
