@@ -8,6 +8,7 @@ import json
 CLIENT_ID = None
 ACCESS_TOKEN = None
 CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'  # required for refresh flow
+
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
 TOKEN_FILE = 'ttlock_token.json'
@@ -54,133 +55,75 @@ PROPERTIES = {
     },
 }
 
-
 def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, booking_id):
     """
     Create a simple lock code for TTLock with full API logic including token refresh.
     
     Args:
-        lock_id: The TTLock lock ID
-        code: The numeric code to create
-        name: Name associated with the code
-        start_ms: Start time in milliseconds (Unix epoch)
-        end_ms: End time in milliseconds (Unix epoch)
-        description: Description of the code
-        booking_id: Booking reference ID for tracking
+        lock_id (int): Lock ID from TTLock system
+        code (str): Lock code to create (numeric, typically 4-6 digits)
+        name (str): User-friendly name for the code
+        start_ms (int): Start time in milliseconds since epoch
+        end_ms (int): End time in milliseconds since epoch
+        description (str): Additional description for the code
+        booking_id (str): Reference booking ID for tracking
     
     Returns:
-        bool: True if successful, False otherwise
+        dict: API response or error dict
     """
-    global ACCESS_TOKEN
+    global ACCESS_TOKEN, CLIENT_ID
     
-    # Debug print at the start of the function
-    print(f"🔧 DEBUG: Creating lock code - lock_id={lock_id}, code={code}, name={name}, booking_id={booking_id}")
+    # Debug: Print input parameters
+    print(f"[DEBUG] create_lock_code_simple called with:")
+    print(f"  lock_id={lock_id}, code={code}, name={name}")
+    print(f"  start_ms={start_ms}, end_ms={end_ms}")
+    print(f"  description={description}, booking_id={booking_id}")
+    
+    # Ensure we have valid credentials
+    if not CLIENT_ID or not ACCESS_TOKEN:
+        print("[ERROR] CLIENT_ID or ACCESS_TOKEN not set. Call initialize_ttlock() first.")
+        return {"success": False, "error": "Credentials not initialized"}
+    
+    # Construct API request
+    endpoint = f"{TTLOCK_API_BASE}/v3/lock/createEKeyByPassword"
+    
+    # TTLock API uses milliseconds directly
+    params = {
+        "clientId": CLIENT_ID,
+        "accessToken": ACCESS_TOKEN,
+        "lockId": lock_id,
+        "keyboardPassword": str(code),
+        "startDate": int(start_ms),
+        "endDate": int(end_ms),
+        "name": name,
+        "description": description,  # Include description in payload
+    }
     
     try:
-        # Ensure we have valid token
-        if not ACCESS_TOKEN:
-            if not load_token_from_file():
-                print(f"❌ No valid access token available for lock_id {lock_id}")
-                return False
-        
-        # Prepare the request
-        url = f"{TTLOCK_API_BASE}/v3/lock/createEKeyByPassword"
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        payload = {
-            'accessToken': ACCESS_TOKEN,
-            'lockId': lock_id,
-            'keyData': code,
-            'startDate': start_ms,
-            'endDate': end_ms,
-            'name': name,
-        }
-        
-        response = requests.post(url, data=payload, headers=headers)
+        print(f"[DEBUG] Sending request to {endpoint}")
+        print(f"[DEBUG] Params: {params}")
+        response = requests.get(endpoint, params=params, timeout=10)
+        print(f"[DEBUG] API Response Status: {response.status_code}")
+        print(f"[DEBUG] API Response Body: {response.text}")
         
         if response.status_code == 200:
-            data = response.json()
-            if data.get('ok'):
-                print(f"✅ Successfully created code '{code}' for lock {lock_id} (booking: {booking_id})")
-                return True
+            result = response.json()
+            if result.get("success"):
+                print(f"[DEBUG] Successfully created lock code. booking_id={booking_id}")
+                return result
             else:
-                error_msg = data.get('msg', 'Unknown error')
-                print(f"❌ API Error for lock {lock_id}: {error_msg}")
-                
-                # If token expired, try refreshing and retrying
-                if 'token' in error_msg.lower() or 'unauthorized' in error_msg.lower():
-                    print(f"🔄 Token may have expired, attempting refresh...")
-                    if refresh_access_token():
-                        # Retry with new token
-                        payload['accessToken'] = ACCESS_TOKEN
-                        response = requests.post(url, data=payload, headers=headers)
-                        data = response.json()
-                        if data.get('ok'):
-                            print(f"✅ Successfully created code '{code}' for lock {lock_id} after token refresh (booking: {booking_id})")
-                            return True
-                
-                return False
+                print(f"[ERROR] API returned success=false: {result}")
+                return result
         else:
-            print(f"❌ HTTP Error {response.status_code} for lock {lock_id}: {response.text}")
-            return False
-    
+            print(f"[ERROR] API returned status {response.status_code}")
+            return {"success": False, "error": f"Status {response.status_code}"}
     except Exception as e:
-        print(f"❌ Exception creating code for lock {lock_id}: {str(e)}")
-        return False
+        print(f"[ERROR] Exception in create_lock_code_simple: {e}")
+        return {"success": False, "error": str(e)}
 
-
-def load_token_from_file():
-    """
-    Load access token from file if it exists and is valid.
-    """
-    global ACCESS_TOKEN
-    
-    try:
-        if os.path.exists(TOKEN_FILE):
-            with open(TOKEN_FILE, 'r') as f:
-                token_data = json.load(f)
-                ACCESS_TOKEN = token_data.get('access_token')
-                if ACCESS_TOKEN:
-                    print(f"✅ Loaded access token from file")
-                    return True
-    except Exception as e:
-        print(f"❌ Error loading token from file: {str(e)}")
-    
-    return False
-
-
-def refresh_access_token():
-    """
-    Refresh the access token using the OAuth2 refresh flow.
-    """
-    global ACCESS_TOKEN
-    
-    try:
-        # Try to load the token from environment or file
-        token_from_env = os.environ.get('TTLOCK_TOKEN')
-        if token_from_env:
-            ACCESS_TOKEN = token_from_env
-            save_token_to_file(ACCESS_TOKEN)
-            return True
-        
-        # If no environment variable, try to load from file
-        if load_token_from_file():
-            return True
-        
-        print(f"❌ Unable to refresh token - no source available")
-        return False
-    
-    except Exception as e:
-        print(f"❌ Error refreshing token: {str(e)}")
-        return False
-
-
-def save_token_to_file(token):
-    """
-    Save access token to file.
-    """
-    try:
-        token_data = {'access_token': token, 'timestamp': int(time.time())}
-        with open(TOKEN_FILE, 'w') as f:
-            json.dump(token_data, f)
-    except Exception as e:
-        print(f"❌ Error saving token to file: {str(e)}")
+def initialize_ttlock(client_id, access_token):
+    """Initialize TTLock credentials."""
+    global CLIENT_ID, ACCESS_TOKEN
+    CLIENT_ID = client_id
+    ACCESS_TOKEN = access_token
+    print(f"[DEBUG] TTLock initialized with CLIENT_ID={client_id}")
