@@ -19,3 +19,9 @@ jobs:
       - name: Run fetch_unlock_records.py
         run: |
           python fetch_unlock_records.py
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add unlock_records.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update unlock_records.csv" && git push)
