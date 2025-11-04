@@ -35,6 +35,7 @@ reservation_code,check_in,check_out,guest_name,door_number,property_location
 001-645-392,2025-10-31T15:00:00.000Z,2025-11-07T11:00:00.000Z,Robin Butcher,Room 2,Norwich
 280-610-092,2025-11-07T15:00:00.000Z,2025-11-10T11:00:00.000Z,Akhtar Bibi,Room 2,Norwich
 262-106-201,2025-11-03T15:00:00.000Z,2025-11-16T11:00:00.000Z,Thi Hoang An Nguyen,Room 3,Norwich
+391-282-492,2025-11-04T15:00:00.000Z,2025-11-05T11:00:00.000Z,John Steedman,Room 4,Norwich
 518-523-862,2025-11-05T15:00:00.000Z,2025-11-07T11:00:00.000Z,William Schofield,Room 4,Norwich
 625-630-924,2025-12-02T15:00:00.000Z,2025-12-04T11:00:00.000Z,andrea baker,Room 4,Norwich
 639-102-862,2025-11-08T15:00:00.000Z,2025-11-10T11:00:00.000Z,Chris Barkway,Room 4,Norwich
