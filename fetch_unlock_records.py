@@ -210,7 +210,7 @@ def main():
             print(f"[Agent] CSV created: {csv_filename}")
         except Exception as e:
                 print(f"[Agent] ERROR: Failed to create CSV: {e}")
-                    sys.exit(1)
+                sys.exit(1)
     
     print(f"[Agent] ===== PROCESS COMPLETED SUCCESSFULLY =====")
     sys.exit(0)
