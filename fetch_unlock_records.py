@@ -208,9 +208,9 @@ def main():
                 writer.writeheader()
                 writer.writerows(all_records)
             print(f"[Agent] CSV created: {csv_filename}")
-            except Exception as e:
-                print(f"[Agent] ERROR: Failed to create CSV: {e}")
-                    sys.exit(1)
+        except Exception as e:
+                    print(f"[Agent] ERROR: Failed to create CSV: {e}")
+                        sys.exit(1)
     
     print(f"[Agent] ===== PROCESS COMPLETED SUCCESSFULLY =====")
     sys.exit(0)
