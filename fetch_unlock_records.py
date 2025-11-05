@@ -193,7 +193,8 @@ def main():
         print(f"[Agent] Script will exit with failure status.")
         sys.exit(1)
     
-        csv_filename = "unlock_records.csv"
+        csv_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "unlock_records.csv")
+            print(f"[DEBUG] CSV file will be created at: {csv_filename}")
         try:
             with open(csv_filename, "w", newline="", encoding='utf-8') as csvfile:
                 fieldnames = []  # Initialize empty list
