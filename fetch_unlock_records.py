@@ -193,24 +193,24 @@ def main():
         print(f"[Agent] Script will exit with failure status.")
         sys.exit(1)
     
-    csv_filename = "unlock_records.csv"
-    try:
-        with open(csv_filename, "w", newline="", encoding='utf-8') as csvfile:
-            fieldnames = []  # Initialize empty list
-        seen = set()
-            for record in all_records:
-                                for key in record.keys():
-                                                        if key not in seen:
-                                                                                    fieldnames.append(key)
-                                                                                    seen.add(key)
-                                                            
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(all_records)
-        print(f"[Agent] CSV created: {csv_filename}")
-            except Exception as e:
-                    print(f"[Agent] ERROR: Failed to create CSV: {e}")
-                    sys.exit(1)
+        csv_filename = "unlock_records.csv"
+        try:
+            with open(csv_filename, "w", newline="", encoding='utf-8') as csvfile:
+                fieldnames = []  # Initialize empty list
+            seen = set()
+                for record in all_records:
+                                    for key in record.keys():
+                                                            if key not in seen:
+                                                                                        fieldnames.append(key)
+                                                                                        seen.add(key)
+                                                                
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(all_records)
+            print(f"[Agent] CSV created: {csv_filename}")
+                except Exception as e:
+                        print(f"[Agent] ERROR: Failed to create CSV: {e}")
+                        sys.exit(1)
     
     print(f"[Agent] ===== PROCESS COMPLETED SUCCESSFULLY =====")
     sys.exit(0)
