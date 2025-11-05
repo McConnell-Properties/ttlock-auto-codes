@@ -196,7 +196,13 @@ def main():
     csv_filename = "unlock_records.csv"
     try:
         with open(csv_filename, "w", newline="", encoding='utf-8') as csvfile:
-            fieldnames = list(all_records[0].keys())
+            fieldnames[]  # Initialize empty list
+            seen = set()
+            for record in all_records:
+                for key in record.keys():
+                    if key not in seen:
+                        fieldnames.append(key)
+                        seen.add(key)
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(all_records)
