@@ -208,8 +208,11 @@ def main():
                 writer.writeheader()
                 writer.writerows(all_records)
             print(f"[Agent] CSV created: {csv_filename}")
+            print(f"[DEBUG] Starting CSV write with {len(all_records)} records")            
+            print(f"[DEBUG] CSV file written. File size: {os.path.getsize(csv_filename)} bytes")
         except Exception as e:
                 print(f"[Agent] ERROR: Failed to create CSV: {e}")
+                        print(f"[DEBUG] Exception traceback: {e}", flush=True)
                 sys.exit(1)
     
     print(f"[Agent] ===== PROCESS COMPLETED SUCCESSFULLY =====")
