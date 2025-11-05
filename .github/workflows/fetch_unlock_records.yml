@@ -27,5 +27,8 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+                    git status
+                              git diff --name-only
           git add unlock_records.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update unlock_records.csv" && git pull --rebase origin main && git push origin main)
+          git commit -m "Update unlock_records.csv" --allow-empty || true
+                    git push origin main
