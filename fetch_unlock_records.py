@@ -92,7 +92,7 @@ def fetch_unlock_records(location, lock_id, attempt=1):
             'lockId': lock_id,
             'date': timestamp,
             'pageNo': 1,
-            'pageSize': 100,
+            'pageSize': 2000,
         }
         
         print(f"[DEBUG] Request payload: clientId={CLIENT_ID}, accessToken={current_access_token[:20]}..., lockId={lock_id}, date={timestamp}")
