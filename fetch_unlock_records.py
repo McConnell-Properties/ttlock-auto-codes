@@ -198,9 +198,12 @@ def main():
         with open(csv_filename, "w", newline="", encoding='utf-8') as csvfile:
             fieldnames = []  # Initialize empty list
 seen = set()
-for record in all_records:                for key in record.keys():                    if key not in seen:
-                        fieldnames.append(key)
-                        seen.add(key)
+            for record in all_records:
+                                for key in record.keys():
+                                                        if key not in seen:
+                                                                                    fieldnames.append(key)
+                                                                                    seen.add(key)
+                                                            
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(all_records)
