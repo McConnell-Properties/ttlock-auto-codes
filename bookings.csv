@@ -1,5 +1,4 @@
 reservation_code,check_in,check_out,guest_name,door_number,property_location
-013-854-361,2025-12-18T15:00:00.000Z,2025-12-21T11:00:00.000Z,Steffen Corneliussen,Room 1,Streatham
 063-639-902,2026-02-09T15:00:00.000Z,2026-02-10T11:00:00.000Z,Charlie McConnell,Room 1,Streatham
 085-035-562,2025-11-11T15:00:00.000Z,2025-11-16T11:00:00.000Z,Stella Nwankwo,Room 1,Streatham
 352-969-011,2025-11-16T15:00:00.000Z,2025-11-22T11:00:00.000Z,Kiran BM,Room 1,Streatham
