@@ -27,7 +27,6 @@ reservation_code,check_in,check_out,guest_name,door_number,property_location
 519-993-982,2025-11-17T15:00:00.000Z,2025-11-29T11:00:00.000Z,Jack Clarke,Room 5,Streatham
 054-042-161,2025-11-13T15:00:00.000Z,2025-11-22T11:00:00.000Z,Stephen Galea,Room 6,Streatham
 121-481-361,2025-11-22T15:00:00.000Z,2025-11-29T11:00:00.000Z,Stephen Galea,Room 6,Streatham
-504-420-922,2025-12-23T15:00:00.000Z,2026-01-02T11:00:00.000Z,Kirandeep Kaur Kirandeep Kaur,Room 6,Streatham
 483-359-012,2026-02-15T15:00:00.000Z,2026-02-19T11:00:00.000Z,Tamer Omran,Room 7,Streatham
 606-498-942,2026-03-02T15:00:00.000Z,2026-03-23T11:00:00.000Z,W?odarczyk-Rybacka Marta,Room 7,Streatham
 648-601-592,2025-11-19T15:00:00.000Z,2025-11-24T11:00:00.000Z,Ericka Escalante Rojas,Room 7,Streatham
@@ -49,9 +48,7 @@ reservation_code,check_in,check_out,guest_name,door_number,property_location
 642-182-544,2025-12-04T15:00:00.000Z,2025-12-07T11:00:00.000Z,Genesio Fascione,Room 11,Streatham
 815-130-344,2025-11-28T15:00:00.000Z,2025-12-01T11:00:00.000Z,Izabela Bolewska,Room 11,Streatham
 889-938-831,2025-12-19T15:00:00.000Z,2025-12-24T11:00:00.000Z,Tifany roux serret,Room 11,Streatham
-942-238-322,2025-11-20T15:00:00.000Z,2025-11-21T11:00:00.000Z,Peter Malla,Room 11,Streatham
 951-858-094,2026-02-14T15:00:00.000Z,2026-02-19T11:00:00.000Z,Adi Mutohar,Room 11,Streatham
-153-616-264,2025-11-14T15:00:00.000Z,2025-11-21T11:00:00.000Z,Roger Patterson,Room 1,Norwich
 493-960-201,2025-11-21T15:00:00.000Z,2025-11-23T11:00:00.000Z,David RUST,Room 1,Norwich
 804-398-181,2025-11-18T15:00:00.000Z,2025-11-25T11:00:00.000Z,Butcher Robin,Room 2,Norwich
 983-561-344,2025-11-27T15:00:00.000Z,2025-12-01T11:00:00.000Z,Peter Duxbury,Room 2,Norwich
@@ -59,7 +56,6 @@ reservation_code,check_in,check_out,guest_name,door_number,property_location
 028-536-824,2025-11-24T15:00:00.000Z,2025-11-28T11:00:00.000Z,Jay Kay,Room 4,Norwich
 264-080-164,2025-11-22T15:00:00.000Z,2025-11-24T11:00:00.000Z,Jack Hopkins,Room 4,Norwich
 509-345-412,2025-11-21T15:00:00.000Z,2025-11-22T11:00:00.000Z,Jake Kay,Room 4,Norwich
-529-122-401,2025-11-17T15:00:00.000Z,2025-11-21T11:00:00.000Z,Grahame Wilfort,Room 4,Norwich
 625-630-924,2025-12-02T15:00:00.000Z,2025-12-04T11:00:00.000Z,andrea baker,Room 4,Norwich
 053-696-662,2025-11-16T15:00:00.000Z,2025-11-22T11:00:00.000Z,Connor Edwards,Room 5,Norwich
 084-982-544,2025-11-24T15:00:00.000Z,2025-11-26T11:00:00.000Z,Saraswoti Byanjankar,Room 5,Norwich
