@@ -34,8 +34,6 @@ reservation_code,check_in,check_out,guest_name,door_number,property_location
 509-001-632,2025-11-30T15:00:00.000Z,2025-12-09T11:00:00.000Z,Jack Smith,Room 8,Streatham
 001-100-682,2025-11-26T15:00:00.000Z,2025-11-27T11:00:00.000Z,victor garcia,Room 9,Streatham
 025-422-164,2025-12-18T15:00:00.000Z,2026-01-07T11:00:00.000Z,Efie & Bruce Vinall,Room 9,Streatham
-324-148-111,2025-12-04T15:00:00.000Z,2025-12-07T11:00:00.000Z,Miguel Angel Abad Rodriguez,Room 9,Streatham
-355-289-802,2025-11-28T15:00:00.000Z,2025-12-03T11:00:00.000Z,Lukasz Slaczka,Room 9,Streatham
 046-691-852,2025-12-24T15:00:00.000Z,2025-12-29T11:00:00.000Z,Rodrigue Wescott,Room 10,Streatham
 113-230-252,2025-12-29T15:00:00.000Z,2026-01-02T11:00:00.000Z,corentin Aubry,Room 10,Streatham
 831-636-362,2025-12-05T15:00:00.000Z,2025-12-08T11:00:00.000Z,Vanessa Valera Gonz?lez,Room 10,Streatham
