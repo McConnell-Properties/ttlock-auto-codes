@@ -35,6 +35,10 @@ jobs:
           name: lock-audit-report
           path: lock_audit_*.csv
           retention-days: 30
+          
+      - name: Compare desired vs actual codes
+        if: always()
+        run: python compare_codes.py
 
       - name: Commit and push audit report
         if: always()
