@@ -3,7 +3,6 @@
 Compare desired codes (from bookings.csv) vs actual codes (from TTLock API).
 Identifies missing, expired, and correctly set codes.
 """
-
 import csv
 import os
 from datetime import datetime
@@ -23,7 +22,7 @@ def load_bookings():
                     'check_out': row['check_out']
                 }
     except FileNotFoundError:
-        print("⚠️  bookings.csv not found")
+        print("⚠️ bookings.csv not found")
     return desired
 
 def load_actual_codes():
@@ -33,17 +32,18 @@ def load_actual_codes():
         with open('ttlock_log.csv', 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                key = (row['property_location'], row['door_number'])
+                # Use property and lock_name instead of property_location and door_number
+                key = (row['property'], row['lock_name'])
                 if key not in actual:
                     actual[key] = []
                 actual[key].append({
-                    'guest_name': row['guest_name'],
-                    'code': row['code_created'],
-                    'status': row['ttlock_response'],
-                    'timestamp': row['timestamp']
+                    'guest_name': row.get('guest_name', 'N/A'),
+                    'code': row.get('code', 'N/A'),
+                    'status': row.get('status', 'N/A'),
+                    'timestamp': row.get('timestamp', 'N/A')
                 })
     except FileNotFoundError:
-        print("⚠️  ttlock_log.csv not found")
+        print("⚠️ ttlock_log.csv not found")
     return actual
 
 def compare_codes():
@@ -70,16 +70,24 @@ def compare_codes():
                 'reason': 'NOT SET ON LOCK'
             })
         else:
-            # Check if the most recent code matches
+            # Check if the most recent code exists and is active
             actual_codes = actual[(prop, door)]
             latest = actual_codes[-1]
             
-            if latest['status'] == 'success':
+            if latest['status'] == 'Active' and latest['code'] != 'N/A':
                 correct.append({
                     'property': prop,
                     'door': door,
                     'guest': booking['guest_name'],
                     'code': latest['code']
+                })
+            elif latest['status'] == 'No codes':
+                missing.append({
+                    'property': prop,
+                    'door': door,
+                    'guest': booking['guest_name'],
+                    'reservation': booking['reservation_code'],
+                    'reason': 'NO CODES FOUND ON LOCK'
                 })
             else:
                 incorrect.append({
@@ -95,20 +103,20 @@ def compare_codes():
         print("-"*80)
         for item in missing:
             print(f"Property: {item['property']}")
-            print(f"  Door: {item['door']}")
-            print(f"  Guest: {item['guest']}")
-            print(f"  Reservation: {item['reservation']}")
-            print(f"  Issue: {item['reason']}\n")
+            print(f" Door: {item['door']}")
+            print(f" Guest: {item['guest']}")
+            print(f" Reservation: {item['reservation']}")
+            print(f" Issue: {item['reason']}\n")
     
     # Report incorrect codes
     if incorrect:
-        print(f"⚠️  INCORRECT CODES ({len(incorrect)})")
+        print(f"⚠️ INCORRECT CODES ({len(incorrect)})")
         print("-"*80)
         for item in incorrect:
             print(f"Property: {item['property']}")
-            print(f"  Door: {item['door']}")
-            print(f"  Guest: {item['guest']}")
-            print(f"  Issue: {item['reason']}\n")
+            print(f" Door: {item['door']}")
+            print(f" Guest: {item['guest']}")
+            print(f" Issue: {item['reason']}\n")
     
     # Report correct codes
     if correct:
@@ -116,18 +124,19 @@ def compare_codes():
         print("-"*80)
         for item in correct:
             print(f"Property: {item['property']}")
-            print(f"  Door: {item['door']}")
-            print(f"  Guest: {item['guest']}")
-            print(f"  Code: {item['code']}\n")
+            print(f" Door: {item['door']}")
+            print(f" Guest: {item['guest']}")
+            print(f" Code: {item['code']}\n")
     
     # Summary
     print("="*80)
     print("📊 SUMMARY")
-    print(f"  Desired codes: {len(desired)}")
-    print(f"  ✅ Correct: {len(correct)}")
-    print(f"  🚨 Missing: {len(missing)}")
-    print(f"  ⚠️  Incorrect: {len(incorrect)}")
-    print(f"  Success rate: {len(correct)}/{len(desired)} ({100*len(correct)//len(desired) if desired else 0}%)")
+    print(f" Desired codes: {len(desired)}")
+    print(f" ✅ Correct: {len(correct)}")
+    print(f" 🚨 Missing: {len(missing)}")
+    print(f" ⚠️ Incorrect: {len(incorrect)}")
+    success_rate = 100 * len(correct) // len(desired) if desired else 0
+    print(f" Success rate: {len(correct)}/{len(desired)} ({success_rate}%)")
     print("="*80)
     
     # Export comparison to CSV
