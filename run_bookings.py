@@ -1,6 +1,5 @@
 # Script to process bookings and create TTLock codes
 # Reads bookings.csv, sets TTLock credentials from environment, and logs actions.
-
 import csv
 import os
 import re
@@ -12,6 +11,9 @@ multi_property_lock_codes.CLIENT_ID = os.getenv("TTLOCK_CLIENT_ID")
 multi_property_lock_codes.ACCESS_TOKEN = os.getenv("TTLOCK_ACCESS_TOKEN")
 
 def main():
+    # Initialize log entries list
+    log_entries = []
+    
     try:
         with open("bookings.csv", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -88,8 +90,30 @@ def main():
                             if result:
                                 print(f"✅ Front door code created successfully (Lock ID: {front_door_lock_id})")
                                 any_success = True
+                                # Log successful front door code
+                                log_entries.append({
+                                    "timestamp": datetime.now().isoformat(),
+                                    "reservation_code": booking_id,
+                                    "guest_name": name,
+                                    "property_location": property_location,
+                                    "door_number": "Front Door",
+                                    "lock_type": "front_door",
+                                    "code_created": "yes",
+                                    "ttlock_response": "success"
+                                })
                             else:
                                 print(f"❌ Failed to create front door code (Lock ID: {front_door_lock_id})")
+                                # Log failed front door code
+                                log_entries.append({
+                                    "timestamp": datetime.now().isoformat(),
+                                    "reservation_code": booking_id,
+                                    "guest_name": name,
+                                    "property_location": property_location,
+                                    "door_number": "Front Door",
+                                    "lock_type": "front_door",
+                                    "code_created": "no",
+                                    "ttlock_response": "failed"
+                                })
                         else:
                             print(f"ℹ️ No front door configured for {property_location}")
                         
@@ -105,8 +129,30 @@ def main():
                             if result:
                                 print(f"✅ Room {door_number} code created successfully (Lock ID: {room_lock_id})")
                                 any_success = True
+                                # Log successful room code
+                                log_entries.append({
+                                    "timestamp": datetime.now().isoformat(),
+                                    "reservation_code": booking_id,
+                                    "guest_name": name,
+                                    "property_location": property_location,
+                                    "door_number": door_number,
+                                    "lock_type": "room",
+                                    "code_created": "yes",
+                                    "ttlock_response": "success"
+                                })
                             else:
                                 print(f"❌ Failed to create room {door_number} code (Lock ID: {room_lock_id})")
+                                # Log failed room code
+                                log_entries.append({
+                                    "timestamp": datetime.now().isoformat(),
+                                    "reservation_code": booking_id,
+                                    "guest_name": name,
+                                    "property_location": property_location,
+                                    "door_number": door_number,
+                                    "lock_type": "room",
+                                    "code_created": "no",
+                                    "ttlock_response": "failed"
+                                })
                         else:
                             print(f"⚠️ No lock configured for room {door_number} at {property_location}")
                             print(f"   🔧 DEBUG: Available rooms in config: {list(property_config.get('ROOM_LOCK_IDS', {}).keys())}")
@@ -116,12 +162,36 @@ def main():
                             print(f"✅ Completed booking {booking_id} for {name} (at least one lock succeeded)")
                         else:
                             print(f"❌ Booking {booking_id} failed - no locks were successfully programmed")
-                    
+                        
                     except Exception as e:
                         print(f"❌ Failed to create code for booking {booking_id}: {e}")
-    
+                        # Log exception
+                        log_entries.append({
+                            "timestamp": datetime.now().isoformat(),
+                            "reservation_code": booking_id,
+                            "guest_name": name,
+                            "property_location": property_location,
+                            "door_number": door_number,
+                            "lock_type": "error",
+                            "code_created": "no",
+                            "ttlock_response": str(e)
+                        })
+                
     except FileNotFoundError:
         print("⚠️ bookings.csv file not found")
+    
+    # Write log entries to CSV
+    if log_entries:
+        print(f"\n📝 Writing {len(log_entries)} log entries to ttlock_log.csv")
+        with open("ttlock_log.csv", "w", newline="", encoding="utf-8") as log_file:
+            fieldnames = ["timestamp", "reservation_code", "guest_name", "property_location", 
+                         "door_number", "lock_type", "code_created", "ttlock_response"]
+            writer = csv.DictWriter(log_file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(log_entries)
+        print("✅ Log file created successfully")
+    else:
+        print("ℹ️ No log entries to write")
 
 if __name__ == "__main__":
     main()
