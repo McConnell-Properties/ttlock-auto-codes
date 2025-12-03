@@ -9,10 +9,10 @@ import hashlib
 # CONSTANTS & CREDENTIALS
 # -----------------------------
 CLIENT_ID = None  # Set by initialize_ttlock()
-CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'
+CLIENT_SECRET = '77d5d26cc0c80c4616378e893ea40b5c'
 
 USERNAME = 'info@mcconnell-properties.com'
-PASSWORD = 'Richard2025$'
+PASSWORD = 'Richard2025$'   # correct developer password
 
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
@@ -65,7 +65,6 @@ PROPERTIES = {
 # TOKEN MANAGEMENT
 # -----------------------------
 def load_token():
-    """Load token JSON if it exists."""
     if not os.path.exists(TOKEN_FILE):
         return None
     try:
@@ -81,7 +80,7 @@ def save_token(data):
 
 
 def request_new_token():
-    """Request a brand-new TTLock access token."""
+    """Request a new TTLock OAuth token using developer username + password."""
     print("🔄 Requesting new TTLock access token…")
 
     md5_pwd = hashlib.md5(PASSWORD.encode("utf-8")).hexdigest()
@@ -98,7 +97,6 @@ def request_new_token():
         timeout=10
     )
 
-    # Parse JSON safely
     try:
         data = resp.json()
     except:
@@ -106,22 +104,17 @@ def request_new_token():
 
     print("🔎 Raw token response:", data)
 
-    # TTLock returns error codes inside JSON
     if "access_token" not in data:
-        err = data.get("errmsg") or data
-        raise Exception(f"❌ Failed to obtain access token: {err}")
+        raise Exception(f"❌ Failed to obtain access token: {data}")
 
-    # Add expiry timestamp
     data["expires_at"] = int(time.time()) + data.get("expires_in", 7200) - 60
 
     save_token(data)
     print("✅ Token refreshed and saved.")
-
     return data
 
 
 def get_access_token():
-    """Return a valid access token, refreshing if expired."""
     token = load_token()
 
     if not token or "expires_at" not in token or time.time() >= token["expires_at"]:
@@ -129,11 +122,13 @@ def get_access_token():
 
     return token["access_token"]
 
+
 # -----------------------------
-# LOCK CODE CREATION
+# CREATE LOCK CODE (WITH RETRIES)
 # -----------------------------
-def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, booking_id):
-    """Create a lock PIN code with automatic token management."""
+def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, booking_id, max_retries=3):
+    """Create a TTLock code with real success detection + retry logic."""
+    global CLIENT_ID
 
     print(f"[DEBUG] create_lock_code_simple called with:")
     print(f"  lock_id={lock_id}, code={code}, name={name}")
@@ -141,53 +136,69 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
     print(f"  description={description}, booking_id={booking_id}")
 
     if not CLIENT_ID:
-        return {"success": False, "error": "CLIENT_ID not set — call initialize_ttlock() first"}
+        return False, "CLIENT_ID not set"
 
-    # Always get a fresh token
-    access_token = get_access_token()
+    for attempt in range(1, max_retries + 1):
 
-    payload = {
-        "clientId": CLIENT_ID,
-        "accessToken": access_token,
-        "lockId": lock_id,
-        "keyboardPwd": str(code),
-        "keyboardPwdName": name,
-        "keyboardPwdType": 3,
-        "startDate": int(start_ms),
-        "endDate": int(end_ms),
-        "addType": 2,
-        "date": int(time.time() * 1000),
-    }
+        print(f"[DEBUG] Attempt {attempt}/{max_retries} for lock {lock_id}")
 
-    endpoint = f"{TTLOCK_API_BASE}/v3/keyboardPwd/add"
+        access_token = get_access_token()
 
-    print(f"[DEBUG] Sending POST to {endpoint}")
-    print(f"[DEBUG] Payload: {payload}")
+        payload = {
+            "clientId": CLIENT_ID,
+            "accessToken": access_token,
+            "lockId": lock_id,
+            "keyboardPwd": str(code),
+            "keyboardPwdName": name,
+            "keyboardPwdType": 3,
+            "startDate": int(start_ms),
+            "endDate": int(end_ms),
+            "addType": 2,
+            "date": int(time.time() * 1000),
+        }
 
-    try:
-        response = requests.post(
-            endpoint,
-            data=payload,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=12
-        )
+        endpoint = f"{TTLOCK_API_BASE}/v3/keyboardPwd/add"
+        print(f"[DEBUG] Sending POST to {endpoint}")
+        print(f"[DEBUG] Payload: {payload}")
 
-        print(f"[DEBUG] Response status: {response.status_code}")
-        print(f"[DEBUG] Response body: {response.text}")
+        try:
+            response = requests.post(
+                endpoint,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=12
+            )
 
-        result = response.json()
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response body: {response.text}")
 
-        # TTLock success is identified by errcode == 0
-        if result.get("errcode") == 0:
-            print(f"✅ TTLock code created successfully for booking {booking_id}")
-            return {"success": True, "data": result}
+            try:
+                result = response.json()
+            except:
+                print("[ERROR] JSON parse failed, retrying…")
+                continue
 
-        print(f"❌ TTLock error: {result}")
-        return {"success": False, "error": result}
+            # SUCCESS CASE: TTLock returns keyboardPwdId on success
+            if "keyboardPwdId" in result:
+                print("✅ TTLock code created successfully!")
+                return True, result
 
-    except Exception as e:
-        print(f"❌ Exception while creating lock code: {e}")
-        return {"success": False, "error": str(e)}
+            # DUPLICATE CODE: real failure (do not retry)
+            if result.get("errcode") == -3007:
+                print("❌ Duplicate passcode. Will NOT retry.")
+                return False, result
+
+            # OTHER ERRORS: retry
+            print(f"[ERROR] TTLock err: {result}, retrying…")
+            continue
+
+        except Exception as e:
+            print(f"[ERROR] Exception: {e}, retrying…")
+            continue
+
+    print("❌ All retry attempts failed.")
+    return False, f"Failed after {max_retries} retries"
+
 
 # -----------------------------
 # INITIALIZE CREDENTIALS
