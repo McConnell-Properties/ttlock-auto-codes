@@ -8,7 +8,7 @@ import hashlib
 # -----------------------------
 # CONSTANTS & CREDENTIALS
 # -----------------------------
-CLIENT_ID = None  # Set dynamically by initialize_ttlock()
+CLIENT_ID = '3a5eb18b49bc4df0b85703071f9e96a5'  # Set dynamically by initialize_ttlock()
 CLIENT_SECRET = '77d5d26cc0c80c4616378e893ea40b5c'  # ← correct secret
 
 USERNAME = 'info@mcconnell-properties.com'
