@@ -1,36 +1,60 @@
 timestamp,reservation_code,guest_name,property_location,door_number,lock_type,code_created,ttlock_response
-2025-12-03T12:51:39.995345,056-022-164,Francisco Casos Esteve,Streatham,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:40.619345,505-582-531,Ilenia Rivero Tor?s,Streatham,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:41.261102,269-663-441,Ingrid Lopez,Streatham,Room 2,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:41.813881,446-996-691,Nathalia Lereverend,Streatham,Room 2,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:42.441142,353-283-141,Jonathan Driver,Streatham,Room 3,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:43.013069,560-551-641,Iurii Turitsyn,Streatham,Room 3,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:43.590869,111-423-682,Aroa Navarro Torregrosa,Streatham,Room 4,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:44.188478,331-835-202,Blaise Onyeneme,Streatham,Room 5,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:44.808880,526-220-992,Mohamed Karar,Streatham,Room 6,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:45.373398,361-030-081,Rosie Lines,Streatham,Room 8,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:45.913686,509-001-632,Jack Smith,Streatham,Room 8,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:46.400480,025-422-164,Efie & Bruce Vinall,Streatham,Room 9,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:46.887582,324-148-111,Miguel Angel Abad Rodriguez,Streatham,Room 9,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:47.370519,355-289-802,Lukasz Slaczka,Streatham,Room 9,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:47.975360,463-619-221,Maty?? ?ern?n,Streatham,Room 9,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:48.584670,681-843-244,Isha Jain,Streatham,Room 10,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:49.068733,029-245-544,Beata Klocek,Streatham,Room 11,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:49.553093,403-634-542,Marlene Frenkel,Streatham,Room 11,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:50.032956,642-182-544,Genesio Fascione,Streatham,Room 11,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:50.513718,045-180-154,Butcher Robin,Norwich,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:51.136652,816-546-682,Maryam Jafari,Norwich,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:51.845130,495-168-621,Armando Morris,Norwich,Room 2,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:52.331784,519-488-102,David RUST,Norwich,Room 3,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:52.899225,012-388-502,Jake Kay,Norwich,Room 4,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:53.381848,625-630-924,andrea baker,Norwich,Room 4,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:53.867886,454-544-642,Bjorn Bantock,Norwich,Room 5,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:54.365568,661-832-384,Imowo Enang,Norwich,Room 5,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:54.849050,460-010-081,Lucas Prado,Tooting,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:55.499252,488-080-931,Vyjith Tomy,Tooting,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:56.224859,536-061-192,Richard Pollok,Tooting,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:56.703931,906-411-651,Tony Dover,Tooting,Room 1,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:57.185651,354-062-621,Jerica Slapnik,Tooting,Room 4,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:57.807279,569-006-212,Richard Pollok,Tooting,Room 4,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:58.296074,423-962-812,Emily Sharratt-Hicks,Tooting,Room 5,error,no,❌ Failed to obtain access token: invalid account or invalid password
-2025-12-03T12:51:58.778439,691-150-902,Richard Pollok,Tooting,Room 6,error,no,❌ Failed to obtain access token: invalid account or invalid password
+2025-12-03T15:24:49.624937,056-022-164,Francisco Casos Esteve,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:24:51.300828,056-022-164,Francisco Casos Esteve,Streatham,Room 1,room,yes,success
+2025-12-03T15:24:53.044887,505-582-531,Ilenia Rivero Tor?s,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:24:57.277261,505-582-531,Ilenia Rivero Tor?s,Streatham,Room 1,room,yes,success
+2025-12-03T15:24:59.134772,269-663-441,Ingrid Lopez,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:01.566118,269-663-441,Ingrid Lopez,Streatham,Room 2,room,yes,success
+2025-12-03T15:25:02.636330,446-996-691,Nathalia Lereverend,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:03.612945,446-996-691,Nathalia Lereverend,Streatham,Room 2,room,yes,success
+2025-12-03T15:25:04.958740,353-283-141,Jonathan Driver,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:18.722715,353-283-141,Jonathan Driver,Streatham,Room 3,room,yes,success
+2025-12-03T15:25:21.129777,560-551-641,Iurii Turitsyn,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:23.199686,560-551-641,Iurii Turitsyn,Streatham,Room 3,room,yes,success
+2025-12-03T15:25:24.203520,111-423-682,Aroa Navarro Torregrosa,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:40.530717,111-423-682,Aroa Navarro Torregrosa,Streatham,Room 4,room,yes,success
+2025-12-03T15:25:42.570833,331-835-202,Blaise Onyeneme,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:44.791790,331-835-202,Blaise Onyeneme,Streatham,Room 5,room,yes,success
+2025-12-03T15:25:46.920592,526-220-992,Mohamed Karar,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:49.004588,526-220-992,Mohamed Karar,Streatham,Room 6,room,yes,success
+2025-12-03T15:25:49.962682,361-030-081,Rosie Lines,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:51.185650,509-001-632,Jack Smith,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:52.313354,025-422-164,Efie & Bruce Vinall,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:54.197355,025-422-164,Efie & Bruce Vinall,Streatham,Room 9,room,yes,success
+2025-12-03T15:25:55.190304,324-148-111,Miguel Angel Abad Rodriguez,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:56.273164,324-148-111,Miguel Angel Abad Rodriguez,Streatham,Room 9,room,yes,success
+2025-12-03T15:25:57.187347,355-289-802,Lukasz Slaczka,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:25:58.120342,355-289-802,Lukasz Slaczka,Streatham,Room 9,room,yes,success
+2025-12-03T15:25:59.090178,463-619-221,Maty?? ?ern?n,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:26:00.017050,463-619-221,Maty?? ?ern?n,Streatham,Room 9,room,yes,success
+2025-12-03T15:26:01.014508,681-843-244,Isha Jain,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:26:02.630258,681-843-244,Isha Jain,Streatham,Room 10,room,yes,success
+2025-12-03T15:26:03.643355,029-245-544,Beata Klocek,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:26:04.812526,403-634-542,Marlene Frenkel,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:26:05.758131,642-182-544,Genesio Fascione,Streatham,Front Door,front_door,yes,success
+2025-12-03T15:26:07.389764,045-180-154,Butcher Robin,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:08.951689,816-546-682,Maryam Jafari,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:10.751446,495-168-621,Armando Morris,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:12.549689,519-488-102,David RUST,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:14.268360,012-388-502,Jake Kay,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:15.908464,625-630-924,andrea baker,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:17.459504,454-544-642,Bjorn Bantock,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:19.082230,661-832-384,Imowo Enang,Norwich,Front Door,front_door,yes,success
+2025-12-03T15:26:21.990451,460-010-081,Lucas Prado,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:23.755597,460-010-081,Lucas Prado,Tooting,Room 1,room,yes,success
+2025-12-03T15:26:28.029711,488-080-931,Vyjith Tomy,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:29.708466,488-080-931,Vyjith Tomy,Tooting,Room 1,room,yes,success
+2025-12-03T15:26:32.248490,536-061-192,Richard Pollok,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:33.847755,536-061-192,Richard Pollok,Tooting,Room 1,room,yes,success
+2025-12-03T15:26:35.441224,906-411-651,Tony Dover,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:37.063952,906-411-651,Tony Dover,Tooting,Room 1,room,yes,success
+2025-12-03T15:26:38.659696,354-062-621,Jerica Slapnik,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:40.349326,354-062-621,Jerica Slapnik,Tooting,Room 4,room,yes,success
+2025-12-03T15:26:42.748759,569-006-212,Richard Pollok,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:44.713774,569-006-212,Richard Pollok,Tooting,Room 4,room,yes,success
+2025-12-03T15:26:46.615932,423-962-812,Emily Sharratt-Hicks,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:48.425681,423-962-812,Emily Sharratt-Hicks,Tooting,Room 5,room,yes,success
+2025-12-03T15:26:50.683625,691-150-902,Richard Pollok,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:52.199304,691-150-902,Richard Pollok,Tooting,Room 6,room,yes,success
+2025-12-03T15:26:53.925957,309-455-161,Mohamed Ali,Tooting,Front Door,front_door,yes,success
+2025-12-03T15:26:56.820992,309-455-161,Mohamed Ali,Tooting,Room 3,room,yes,success
