@@ -1,7 +1,7 @@
 name: Hourly Lock Code Generator
 on:
   schedule:
-    - cron: "*/4 * * * *"
+    - cron: "*/7 * * * *"
       # every 4 minutes UTC
   workflow_dispatch:
 
