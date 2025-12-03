@@ -12,7 +12,7 @@ CLIENT_ID = None  # Set by initialize_ttlock()
 CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'
 
 USERNAME = 'info@mcconnell-properties.com'
-PASSWORD = 'airbnb.bc.25'
+PASSWORD = 'Richard2025$'
 
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
