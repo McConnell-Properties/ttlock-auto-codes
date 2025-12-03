@@ -8,11 +8,11 @@ import hashlib
 # -----------------------------
 # CONSTANTS & CREDENTIALS
 # -----------------------------
-CLIENT_ID = None  # Set by initialize_ttlock()
-CLIENT_SECRET = '77d5d26cc0c80c4616378e893ea40b5c'
+CLIENT_ID = None  # Set dynamically by initialize_ttlock()
+CLIENT_SECRET = '77d5d26cc0c80c4616378e893ea40b5c'  # ← correct secret
 
 USERNAME = 'info@mcconnell-properties.com'
-PASSWORD = 'Richard2025$'   # correct developer password
+PASSWORD = 'Richard2025$'  # ← correct developer password
 
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
@@ -80,7 +80,7 @@ def save_token(data):
 
 
 def request_new_token():
-    """Request a new TTLock OAuth token using developer username + password."""
+    """Request a new TTLock OAuth token using developer credentials."""
     print("🔄 Requesting new TTLock access token…")
 
     md5_pwd = hashlib.md5(PASSWORD.encode("utf-8")).hexdigest()
@@ -107,7 +107,8 @@ def request_new_token():
     if "access_token" not in data:
         raise Exception(f"❌ Failed to obtain access token: {data}")
 
-    data["expires_at"] = int(time.time()) + data.get("expires_in", 7200) - 60
+    # expires_in is long-term (90 days)
+    data["expires_at"] = int(time.time()) + data["expires_in"] - 60
 
     save_token(data)
     print("✅ Token refreshed and saved.")
@@ -115,6 +116,7 @@ def request_new_token():
 
 
 def get_access_token():
+    """Return a valid access token, refreshing automatically."""
     token = load_token()
 
     if not token or "expires_at" not in token or time.time() >= token["expires_at"]:
@@ -127,7 +129,7 @@ def get_access_token():
 # CREATE LOCK CODE (WITH RETRIES)
 # -----------------------------
 def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, booking_id, max_retries=3):
-    """Create a TTLock code with real success detection + retry logic."""
+    """Create a TTLock code with accurate success detection + retry logic."""
     global CLIENT_ID
 
     print(f"[DEBUG] create_lock_code_simple called with:")
@@ -178,18 +180,18 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
                 print("[ERROR] JSON parse failed, retrying…")
                 continue
 
-            # SUCCESS CASE: TTLock returns keyboardPwdId on success
+            # TRUE SUCCESS
             if "keyboardPwdId" in result:
                 print("✅ TTLock code created successfully!")
                 return True, result
 
-            # DUPLICATE CODE: real failure (do not retry)
+            # DUPLICATE CODE = REAL FAILURE, do NOT retry
             if result.get("errcode") == -3007:
                 print("❌ Duplicate passcode. Will NOT retry.")
                 return False, result
 
-            # OTHER ERRORS: retry
-            print(f"[ERROR] TTLock err: {result}, retrying…")
+            # OTHER ERRORS → retry
+            print(f"[ERROR] TTLock error: {result}, retrying…")
             continue
 
         except Exception as e:
@@ -204,6 +206,7 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
 # INITIALIZE CREDENTIALS
 # -----------------------------
 def initialize_ttlock(client_id):
+    """Called by run_bookings.py to set client ID from environment."""
     global CLIENT_ID
     CLIENT_ID = client_id
     print(f"[DEBUG] TTLock initialized with CLIENT_ID={client_id}")
