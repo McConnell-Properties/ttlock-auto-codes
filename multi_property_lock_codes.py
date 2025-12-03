@@ -6,10 +6,11 @@ import json
 import hashlib
 
 # -----------------------------
-# CONFIG / CONSTANTS
+# CONSTANTS & CREDENTIALS
 # -----------------------------
-CLIENT_ID = None
+CLIENT_ID = None  # Set by initialize_ttlock()
 CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'
+
 USERNAME = 'info@mcconnell-properties.com'
 PASSWORD = 'airbnb.bc.25'
 
@@ -61,9 +62,10 @@ PROPERTIES = {
 }
 
 # -----------------------------
-# TOKEN HANDLING
+# TOKEN MANAGEMENT
 # -----------------------------
 def load_token():
+    """Load token JSON if it exists."""
     if not os.path.exists(TOKEN_FILE):
         return None
     try:
@@ -79,6 +81,7 @@ def save_token(data):
 
 
 def request_new_token():
+    """Request a brand-new TTLock access token."""
     print("🔄 Requesting new TTLock access token…")
 
     md5_pwd = hashlib.md5(PASSWORD.encode("utf-8")).hexdigest()
@@ -95,34 +98,42 @@ def request_new_token():
         timeout=10
     )
 
-    resp.raise_for_status()
-    data = resp.json()
+    # Parse JSON safely
+    try:
+        data = resp.json()
+    except:
+        raise Exception(f"❌ Token endpoint returned non-JSON response: {resp.text}")
 
-    # TTLock tokens expire every 2 hours—no refresh token exists
+    print("🔎 Raw token response:", data)
+
+    # TTLock returns error codes inside JSON
+    if "access_token" not in data:
+        err = data.get("errmsg") or data
+        raise Exception(f"❌ Failed to obtain access token: {err}")
+
+    # Add expiry timestamp
     data["expires_at"] = int(time.time()) + data.get("expires_in", 7200) - 60
 
     save_token(data)
     print("✅ Token refreshed and saved.")
+
     return data
 
 
 def get_access_token():
-    """Returns a valid access token, refreshing if needed."""
+    """Return a valid access token, refreshing if expired."""
     token = load_token()
 
-    if not token or time.time() >= token.get("expires_at", 0):
+    if not token or "expires_at" not in token or time.time() >= token["expires_at"]:
         token = request_new_token()
 
     return token["access_token"]
 
 # -----------------------------
-# MAIN LOCK-CREATION FUNCTION
+# LOCK CODE CREATION
 # -----------------------------
 def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, booking_id):
-    """
-    Create a lock code with auto token-refresh and correct error handling.
-    """
-    global CLIENT_ID
+    """Create a lock PIN code with automatic token management."""
 
     print(f"[DEBUG] create_lock_code_simple called with:")
     print(f"  lock_id={lock_id}, code={code}, name={name}")
@@ -130,10 +141,9 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
     print(f"  description={description}, booking_id={booking_id}")
 
     if not CLIENT_ID:
-        print("[ERROR] CLIENT_ID not set. Call initialize_ttlock() first.")
-        return {"success": False, "error": "CLIENT_ID not set"}
+        return {"success": False, "error": "CLIENT_ID not set — call initialize_ttlock() first"}
 
-    # Always fetch a fresh token
+    # Always get a fresh token
     access_token = get_access_token()
 
     payload = {
@@ -151,39 +161,38 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
 
     endpoint = f"{TTLOCK_API_BASE}/v3/keyboardPwd/add"
 
-    try:
-        print(f"[DEBUG] Sending POST request to {endpoint}")
-        print(f"[DEBUG] Payload: {payload}")
+    print(f"[DEBUG] Sending POST to {endpoint}")
+    print(f"[DEBUG] Payload: {payload}")
 
+    try:
         response = requests.post(
             endpoint,
             data=payload,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=10
+            timeout=12
         )
 
-        print(f"[DEBUG] API Response Status: {response.status_code}")
-        print(f"[DEBUG] API Response Body: {response.text}")
+        print(f"[DEBUG] Response status: {response.status_code}")
+        print(f"[DEBUG] Response body: {response.text}")
 
         result = response.json()
 
-        # Proper TTLock success condition: errcode == 0
+        # TTLock success is identified by errcode == 0
         if result.get("errcode") == 0:
             print(f"✅ TTLock code created successfully for booking {booking_id}")
             return {"success": True, "data": result}
 
-        print(f"[ERROR] TTLock returned error: {result}")
+        print(f"❌ TTLock error: {result}")
         return {"success": False, "error": result}
 
     except Exception as e:
-        print(f"[ERROR] Exception in create_lock_code_simple: {e}")
+        print(f"❌ Exception while creating lock code: {e}")
         return {"success": False, "error": str(e)}
 
 # -----------------------------
-# INITIALIZER
+# INITIALIZE CREDENTIALS
 # -----------------------------
 def initialize_ttlock(client_id):
-    """Initialize TTLock credentials."""
     global CLIENT_ID
     CLIENT_ID = client_id
     print(f"[DEBUG] TTLock initialized with CLIENT_ID={client_id}")
