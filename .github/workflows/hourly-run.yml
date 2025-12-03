@@ -28,9 +28,14 @@ jobs:
 
       - name: Commit ttlock_log.csv
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git pull --rebase origin main
+        git add ttlock_log.csv
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update ttlock_log.csv with latest run"
+        git push     git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git pull --rebase origin main
-git add ttlock_log.csv
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update ttlock_log.csv with latest run"
-          git push
+    git add ttlock_log.csv
+            git diff --quiet && git diff --staged --quiet || git commit -m "Update ttlock_log.csv with latest run"
+            git push
