@@ -8,11 +8,11 @@ import hashlib
 # -----------------------------
 # CONSTANTS & CREDENTIALS
 # -----------------------------
-CLIENT_ID = '3a5eb18b49bc4df0b85703071f9e96a5'  # Set dynamically by initialize_ttlock()
-CLIENT_SECRET = '77d5d26cc0c80c4616378e893ea40b5c'  # ← correct secret
+CLIENT_ID = None  # Set dynamically by initialize_ttlock()
+CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'  # ← correct secret
 
 USERNAME = 'info@mcconnell-properties.com'
-PASSWORD = 'Richard2025$'  # ← correct developer password
+PASSWORD = 'Richard2025$'   # ← correct developer password
 
 OAUTH_HOST = 'https://api.sciener.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
@@ -107,7 +107,6 @@ def request_new_token():
     if "access_token" not in data:
         raise Exception(f"❌ Failed to obtain access token: {data}")
 
-    # expires_in is long-term (90 days)
     data["expires_at"] = int(time.time()) + data["expires_in"] - 60
 
     save_token(data)
