@@ -35,7 +35,7 @@ PROPERTIES = {
             'Room 4': 24746950,
             'Room 5': 24717236,
             'Room 6': 24717242,
-            'Room 7': None,
+            'Room 7': 26157268,
             'Room 8': None,
             'Room 9': 24692300,
             'Room 10': 24717964,
