@@ -1,58 +1,7 @@
 timestamp,reservation_code,guest_name,property_location,door_number,lock_type,code_created,ttlock_response
-2025-12-03T11:38:28.375018,056-022-164,Francisco Casos Esteve,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:28.982171,056-022-164,Francisco Casos Esteve,Streatham,Room 1,room,yes,success
-2025-12-03T11:38:29.591470,505-582-531,Ilenia Rivero Tor?s,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:30.152244,505-582-531,Ilenia Rivero Tor?s,Streatham,Room 1,room,yes,success
-2025-12-03T11:38:30.851145,269-663-441,Ingrid Lopez,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:31.425420,269-663-441,Ingrid Lopez,Streatham,Room 2,room,yes,success
-2025-12-03T11:38:32.006772,446-996-691,Nathalia Lereverend,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:32.574916,446-996-691,Nathalia Lereverend,Streatham,Room 2,room,yes,success
-2025-12-03T11:38:33.146337,353-283-141,Jonathan Driver,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:33.726357,353-283-141,Jonathan Driver,Streatham,Room 3,room,yes,success
-2025-12-03T11:38:34.330995,560-551-641,Iurii Turitsyn,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:34.900082,560-551-641,Iurii Turitsyn,Streatham,Room 3,room,yes,success
-2025-12-03T11:38:35.466933,111-423-682,Aroa Navarro Torregrosa,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:36.026748,111-423-682,Aroa Navarro Torregrosa,Streatham,Room 4,room,yes,success
-2025-12-03T11:38:36.593819,331-835-202,Blaise Onyeneme,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:37.151752,331-835-202,Blaise Onyeneme,Streatham,Room 5,room,yes,success
-2025-12-03T11:38:37.732629,526-220-992,Mohamed Karar,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:38.290787,526-220-992,Mohamed Karar,Streatham,Room 6,room,yes,success
-2025-12-03T11:38:38.849087,361-030-081,Rosie Lines,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:39.409310,509-001-632,Jack Smith,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:39.985711,025-422-164,Efie & Bruce Vinall,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:40.567326,025-422-164,Efie & Bruce Vinall,Streatham,Room 9,room,yes,success
-2025-12-03T11:38:41.137224,324-148-111,Miguel Angel Abad Rodriguez,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:41.706417,324-148-111,Miguel Angel Abad Rodriguez,Streatham,Room 9,room,yes,success
-2025-12-03T11:38:42.271533,355-289-802,Lukasz Slaczka,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:42.832079,355-289-802,Lukasz Slaczka,Streatham,Room 9,room,yes,success
-2025-12-03T11:38:43.391851,463-619-221,Maty?? ?ern?n,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:43.951248,463-619-221,Maty?? ?ern?n,Streatham,Room 9,room,yes,success
-2025-12-03T11:38:44.530071,681-843-244,Isha Jain,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:45.093576,681-843-244,Isha Jain,Streatham,Room 10,room,yes,success
-2025-12-03T11:38:45.659121,029-245-544,Beata Klocek,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:46.230527,403-634-542,Marlene Frenkel,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:46.794934,642-182-544,Genesio Fascione,Streatham,Front Door,front_door,yes,success
-2025-12-03T11:38:47.370144,045-180-154,Butcher Robin,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:47.939069,816-546-682,Maryam Jafari,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:48.497653,495-168-621,Armando Morris,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:49.057130,519-488-102,David RUST,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:49.618227,012-388-502,Jake Kay,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:50.175882,625-630-924,andrea baker,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:50.738996,454-544-642,Bjorn Bantock,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:51.321247,661-832-384,Imowo Enang,Norwich,Front Door,front_door,yes,success
-2025-12-03T11:38:51.889354,460-010-081,Lucas Prado,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:52.447948,460-010-081,Lucas Prado,Tooting,Room 1,room,yes,success
-2025-12-03T11:38:53.021292,488-080-931,Vyjith Tomy,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:53.580470,488-080-931,Vyjith Tomy,Tooting,Room 1,room,yes,success
-2025-12-03T11:38:54.154600,536-061-192,Richard Pollok,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:54.723366,536-061-192,Richard Pollok,Tooting,Room 1,room,yes,success
-2025-12-03T11:38:55.284985,906-411-651,Tony Dover,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:55.847576,906-411-651,Tony Dover,Tooting,Room 1,room,yes,success
-2025-12-03T11:38:56.405400,354-062-621,Jerica Slapnik,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:56.968858,354-062-621,Jerica Slapnik,Tooting,Room 4,room,yes,success
-2025-12-03T11:38:57.534661,569-006-212,Richard Pollok,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:58.113659,569-006-212,Richard Pollok,Tooting,Room 4,room,yes,success
-2025-12-03T11:38:58.679873,423-962-812,Emily Sharratt-Hicks,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:38:59.236992,423-962-812,Emily Sharratt-Hicks,Tooting,Room 5,room,yes,success
-2025-12-03T11:38:59.810766,691-150-902,Richard Pollok,Tooting,Front Door,front_door,yes,success
-2025-12-03T11:39:00.389127,691-150-902,Richard Pollok,Tooting,Room 6,room,yes,success
+2025-12-03T12:14:12.557772,263-969-531,David Pettite,Streatham,Front Door,front_door,yes,success
+2025-12-03T12:14:13.132881,263-969-531,David Pettite,Streatham,Room 4,room,yes,success
+2025-12-03T12:14:13.755637,431-926-684,Roger Connolly,Streatham,Front Door,front_door,yes,success
+2025-12-03T12:14:14.236485,431-926-684,Roger Connolly,Streatham,Room 4,room,yes,success
+2025-12-03T12:14:14.718749,422-535-194,Elliot Mcadam,Norwich,Front Door,front_door,yes,success
+2025-12-03T12:14:15.356930,911-028-344,Braydon Burt,Norwich,Front Door,front_door,yes,success
