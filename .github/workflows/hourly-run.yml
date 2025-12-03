@@ -28,7 +28,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add ttlock_log.csv
+          git add ttlock_log.csv ttlock_token.json
           git pull --rebase --autostash origin main
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update ttlock_log.csv with latest run"
+          git add ttlock_log.csv ttlock_token.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update ttlock logs"
           git push
