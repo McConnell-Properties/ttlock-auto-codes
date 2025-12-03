@@ -1,8 +1,8 @@
 name: Hourly Lock Code Generator
 on:
   schedule:
-    - cron: "*/10 * * * *"
-      # every 10 minutes UTC
+    - cron: "*/1 * * * *"
+      # every 1 minutes UTC
   workflow_dispatch:
 
 permissions:
