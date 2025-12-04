@@ -1,0 +1,22 @@
+name: Export Bookings From GAS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - bookings.csv
+
+jobs:
+  bookings-export:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Confirm CSV received
+      run: |
+        echo "📄 bookings.csv updated by Google Apps Script"
+        ls -lah
