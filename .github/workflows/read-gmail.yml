@@ -7,6 +7,8 @@ on:
 
 jobs:
   read-gmail:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
