@@ -1,0 +1,51 @@
+name: Run Full Automation Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 pandas
+
+      - name: Create service account credentials file
+        run: |
+          echo "${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}" > service_account.json
+
+      - name: Export environment variables
+        run: |
+          echo "GMAIL_USER=${{ secrets.GMAIL_USER }}" >> $GITHUB_ENV
+          echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
+          echo "SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}" >> $GITHUB_ENV
+          echo "GOOGLE_APPLICATION_CREDENTIALS=service_account.json" >> $GITHUB_ENV
+
+      - name: Run main automation file
+        run: |
+          cd scripts
+          python3 main.py
+
+      - name: Commit updated CSV logs (if changed)
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add automation-data/*.csv || true
+          git diff --cached --quiet || git commit -m "Update automation logs"
+          git push || true
