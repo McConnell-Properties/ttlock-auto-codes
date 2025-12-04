@@ -1,0 +1,35 @@
+name: Handle Booking Payment Emails
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+jobs:
+  process_email:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Receive email
+      id: email
+      uses: dawidd6/action-receive-email@v3
+      with:
+        server: imap.gmail.com
+        username: ${{ secrets.AUTOMATION_EMAIL_USER }}
+        password: ${{ secrets.AUTOMATION_EMAIL_PASS }}
+        subject_contains: "Pre-authorisation confirmed"
+        mark_as_read: true
+
+    - name: Extract booking reference
+      id: parse
+      run: |
+        echo "Raw subject: ${{ steps.email.outputs.subject }}"
+        REF=$(echo "${{ steps.email.outputs.subject }}" | grep -oE '[0-9]{3}-[0-9]{3}-[0-9]{3}' || true)
+        echo "ref=$REF" >> $GITHUB_OUTPUT
+
+    - name: Send to Google Sheets Webhook
+      if: steps.parse.outputs.ref != ''
+      run: |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -d "{\"ref\":\"${{ steps.parse.outputs.ref }}\"}" \
+          "${{ secrets.GS_WEBHOOK_URL }}"
