@@ -25,9 +25,12 @@ def send_to_webhook(ref, received_at):
     print(f"[WEBHOOK] Response status: {resp.status_code}, body: {resp.text}")
 
 
+
 def main():
     with IMAPClient(IMAP_HOST) as server:
         print("[IMAP] Connecting...")
+        print("[DEBUG] USER:", repr(USER))
+        print("[DEBUG] PASSWORD:", repr(PASSWORD))
         server.login(USER, PASSWORD)
         print("[IMAP] Logged in as", USER)
 
