@@ -2,7 +2,7 @@ name: Read Gmail for Payments
 
 on:
   schedule:
-    - cron: "*/1 * * * *"  # every minute
+    - cron: "*/1 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,21 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: pip install imapclient pyzmail36 requests
+      - name: Install dependencies
+        run: pip install imapclient pyzmail36 requests
 
-    - name: Run Gmail Reader
-      env:
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        APPS_SCRIPT_WEBHOOK: "https://script.google.com/macros/s/AKfycbzZj9NlygD_KQE51InBIaHAOD-NjMiKiQUyjWeX4ZzQ3JE68KtgPV7QXwUyHLPdFaxG/exec"
-        GITHUB_TOKEN: ${{ secrets.PA_TOKEN }}   # <--- ADD THIS LINE
-      run: python read_gmail.py
+      - name: Run Gmail Reader
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          APPS_SCRIPT_WEBHOOK: "https://script.google.com/macros/s/AKfycbzZj9NlygD_KQE51InBIaHAOD-NjMiKiQUyjWeX4ZzQ3JE68KtgPV70XUyHLpDfPaxG/exec"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python read_gmail.py
