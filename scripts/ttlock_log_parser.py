@@ -1,45 +1,20 @@
-import csv
-import os
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
 
-CSV = "automation-data/ttlock_log.csv"
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+CSV_INPUT = "automation-data/ttlock_log.csv"
+CSV_OUTPUT = "automation-data/ttlock_log.csv"
 
-def sync_log():
-    scope = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        eval(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")),
-        scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SPREADSHEET_ID).worksheet("Deposit Payments")
 
-    success = {}
+def parse_ttlock_log():
+    print("Step 2: Parsing TTLock log …")
 
-    with open(CSV) as f:
-        rows = list(csv.DictReader(f))
+    try:
+        df = pd.read_csv(CSV_INPUT)
+    except:
+        print("No ttlock_log.csv found.")
+        return
 
-    for r in rows:
-        ref = r["reservation_code"]
-        if ref not in success:
-            success[ref] = {"front": False, "room": False}
+    # basic cleanup: drop empty rows
+    df = df.dropna(subset=["reservation_code"])
 
-        if r["code_created"] == "yes" and r["ttlock_response"] == "success":
-            if r["lock_type"] == "front_door":
-                success[ref]["front"] = True
-            elif r["lock_type"] == "room":
-                success[ref]["room"] = True
-
-    for ref, info in success.items():
-        matches = sheet.findall(ref)
-        if not matches:
-            continue
-
-        row = matches[0].row
-        if info["front"]:
-            sheet.update_cell(row, 13, "Yes")
-        if info["room"]:
-            sheet.update_cell(row, 14, "Yes")
-
-if __name__ == "__main__":
-    sync_log()
+    df.to_csv(CSV_OUTPUT, index=False)
+    print("✔ TTLock log cleaned and saved.")
