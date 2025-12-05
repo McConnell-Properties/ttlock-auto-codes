@@ -44,11 +44,6 @@ jobs:
           echo "TTLOCK_CLIENT_ID=${{ secrets.TTLOCK_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TTLOCK_CLIENT_SECRET=${{ secrets.TTLOCK_CLIENT_SECRET }}" >> $GITHUB_ENV
 
-      # ----------------------------------------------------------
-      # STEP 1 — REMOVE OLD FETCH_ICAL STEP (GAS now handles this)
-      # ----------------------------------------------------------
-      # (NO LONGER EXISTS)
-
       # ---------------------------
       # STEP 1 — PAYMENTS VIA GMAIL
       # ---------------------------
@@ -67,10 +62,15 @@ jobs:
       - name: Parse TTLock logs
         run: python scripts/ttlock_log_parser.py
 
+      # ----------------------------------------------------------
+      # STEP 3b — BUILD COMBINED CSV FOR GOOGLE SHEETS
+      # ----------------------------------------------------------
+      - name: Build combined reservation summary CSV
+        run: python scripts/build_combined_csv.py
+
       # ---------------------------
       # STEP 4 — UPDATE GOOGLE SHEETS (OPTIONAL)
       # ---------------------------
-      
 
       # ===========================================================
       # FINAL SAFE COMMIT — NEVER FAILS OR REJECTS
@@ -94,7 +94,6 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
 
-          # Sync with remote but keep CSV staging
           git fetch origin main
           git reset --soft origin/main
 
