@@ -16,6 +16,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure automation-data folder exists
+        run: mkdir -p automation-data
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -23,12 +26,14 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install pandas
+          pip install pandas requests
 
       - name: Export environment variables
         run: |
           echo "GMAIL_USER=${{ secrets.GMAIL_USER }}" >> $GITHUB_ENV
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
+          echo "TTLOCK_CLIENT_ID=${{ secrets.TTLOCK_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TTLOCK_CLIENT_SECRET=${{ secrets.TTLOCK_CLIENT_SECRET }}" >> $GITHUB_ENV
 
       - name: Run Python automation
         run: python scripts/main.py
