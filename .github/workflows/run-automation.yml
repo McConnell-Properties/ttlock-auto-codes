@@ -22,9 +22,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 pandas
+  run: |
+    pip install --upgrade pip
+    pip install google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 pandas gspread oauth2client
 
       - name: Create service account credentials file
         run: |
