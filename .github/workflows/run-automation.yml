@@ -63,10 +63,10 @@ jobs:
         run: python scripts/ttlock_log_parser.py
 
       # ----------------------------------------------------------
-      # STEP 3b — BUILD COMBINED CSV FOR GOOGLE SHEETS
-      # ----------------------------------------------------------
+  
       - name: Build combined reservation summary CSV
-        run: python scripts/build_combined_csv.py
+        run: python scripts/build_reservation_status.py
+
 
       # ---------------------------
       # STEP 4 — UPDATE GOOGLE SHEETS (OPTIONAL)
