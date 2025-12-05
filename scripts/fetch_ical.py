@@ -1,22 +1,75 @@
 import requests
-import csv
 import re
-from datetime import datetime, timedelta
-import os
+import csv
+from datetime import datetime
 
-OUTPUT_PATH = "automation-data/bookings.csv"
+OUTPUT_FILE = "automation-data/bookings.csv"
 
-ICAL_SOURCES = {
+# ------------------------------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------------------------------
+
+def extract_value(block, field):
+    """Extract simple iCal fields like SUMMARY: or DESCRIPTION:"""
+    m = re.search(rf"{field}(?:;[^:]+)?:([^\r\n]+)", block)
+    return m.group(1).strip() if m else ""
+
+def extract_datetime(block, field):
+    """Extract DTSTART/DTEND packets from VEVENT."""
+    m = re.search(rf"{field}(?:;[^:]+)?:(\d{{8}}T?\d{{6}}|\d{{8}})", block)
+    return m.group(1).strip() if m else ""
+
+def parse_ical_date(dt):
+    """Convert YYYYMMDD or YYYYMMDDTHHMMSS into ISO date: YYYY-MM-DD."""
+    if not dt:
+        return ""
+    date_part = dt[:8]
+    try:
+        return datetime.strptime(date_part, "%Y%m%d").strftime("%Y-%m-%d")
+    except:
+        return ""
+
+def extract_guest_details(description):
+    """Extract guest name, email, phone from DESCRIPTION best-effort."""
+    email_regex = r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"
+    phone_regex = r"(\+?\d[\d\s\-]{7,}\d)"
+
+    email = ""
+    phone = ""
+    name = description.strip()
+
+    m = re.search(email_regex, description)
+    if m:
+        email = m.group(1)
+        name = name.replace(email, "").strip()
+
+    m = re.search(phone_regex, description)
+    if m:
+        phone = re.sub(r"\s+", "", m.group(1))
+        name = name.replace(m.group(1), "").strip()
+
+    name = re.sub(r"\s+", " ", name).strip()
+    if len(name) < 2:
+        name = ""
+
+    return name, email, phone
+
+
+# ------------------------------------------------------------------------------------
+# FULL ICS URL LIST (EXACT FROM GAS)
+# ------------------------------------------------------------------------------------
+
+ICAL_URLS = {
     "Streatham": {
-        "Room 1": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/913d99b1-2eef-4c92-878d-732407d458dd/ical.ics",
-        "Room 2": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/859bbdad-ed8b-401c-b1c6-15eadad7035f/ical.ics",
-        "Room 3": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/0484521e-b98b-46f8-b71a-50adeea7cc23/ical.ics",
-        "Room 4": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/e2e623fd-b7d4-4580-bb63-4a0f7ddeb1a5/ical.ics",
-        "Room 5": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/880b9a67-fe17-4d6f-8c3e-bb194dcc1eeb/ical.ics",
-        "Room 6": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/b1c750b8-0c22-4fa1-b113-322fca48c20b/ical.ics",
-        "Room 7": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/e5b80ef1-5d72-4546-b6dc-62d3d5a426be/ical.ics",
-        "Room 8": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/1102b319-9da1-4f75-aced-020129964a3e/ical.ics",
-        "Room 9": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/d772f9c8-f1d8-4bb4-9234-8c46c747400f/ical.ics",
+        "Room 1":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/913d99b1-2eef-4c92-878d-732407d458dd/ical.ics",
+        "Room 2":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/859bbdad-ed8b-401c-b1c6-15eadad7035f/ical.ics",
+        "Room 3":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/0484521e-b98b-46f8-b71a-50adeea7cc23/ical.ics",
+        "Room 4":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/e2e623fd-b7d4-4580-bb63-4a0f7ddeb1a5/ical.ics",
+        "Room 5":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/880b9a67-fe17-4d6f-8c3e-bb194dcc1eeb/ical.ics",
+        "Room 6":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/b1c750b8-0c22-4fa1-b113-322fca48c20b/ical.ics",
+        "Room 7":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/e5b80ef1-5d72-4546-b6dc-62d3d5a426be/ical.ics",
+        "Room 8":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/1102b319-9da1-4f75-aced-020129964a3e/ical.ics",
+        "Room 9":  "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/d772f9c8-f1d8-4bb4-9234-8c46c747400f/ical.ics",
         "Room 10": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/29fea56a-c6ba-42d9-9d89-e20094c8b2bb/ical.ics",
         "Room 11": "https://io.eviivo.com/pms/v2/open/property/StreathamRoomsCR4/rooms/cd990a37-0e27-4f1c-8664-ad3cad3fa845/ical.ics",
     },
@@ -34,95 +87,67 @@ ICAL_SOURCES = {
         "Room 4": "https://io.eviivo.com/pms/v2/open/property/TooStaysSW17/rooms/231e6d4a-9d9f-4a3f-bd89-701fb017d52f/ical.ics",
         "Room 5": "https://io.eviivo.com/pms/v2/open/property/TooStaysSW17/rooms/a20cdff1-f242-4d2c-8b4c-30d891e95460/ical.ics",
         "Room 6": "https://io.eviivo.com/pms/v2/open/property/TooStaysSW17/rooms/7919787f-89bd-4e25-97aa-6147cf490fe9/ical.ics",
-    },
+    }
 }
 
-def extract(field, text):
-    m = re.search(field + r"(?:;[^:]+)?:([^\r\n]+)", text)
-    return m.group(1).strip() if m else ""
 
-def extract_dt(field, text):
-    m = re.search(field + r"(?:;[^:]+)?:(\d{8}T?\d{6})", text)
-    return m.group(1).strip() if m else ""
-
-def parse_date(dt):
-    try:
-        return datetime.strptime(dt[:8], "%Y%m%d")
-    except:
-        return None
-
-def parse_detail(desc):
-    email = ""
-    personal = ""
-    email_match = re.search(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", desc)
-    if email_match:
-        email = email_match.group(1)
-        if "booking.com" not in email and "expedia" not in email:
-            personal = email
-    return email, personal
+# ------------------------------------------------------------------------------------
+# MAIN
+# ------------------------------------------------------------------------------------
 
 def main():
     rows = []
-    today = datetime.now()
-    max_ci = today + timedelta(days=30)
 
-    for location, rooms in ICAL_SOURCES.items():
+    for location, rooms in ICAL_URLS.items():
         for room, url in rooms.items():
+            print(f"📡 Fetching {location} – {room}…")
+
             try:
-                data = requests.get(url, timeout=15).text.replace("\n ", "")
-            except:
+                resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+                text = resp.text.replace("\n ", "").replace("\r ", "")
+            except Exception as e:
+                print(f"❌ Failed to fetch {location} – {room}: {e}")
                 continue
 
-            events = data.split("BEGIN:VEVENT")[1:]
+            events = text.split("BEGIN:VEVENT")
+            if len(events) <= 1:
+                print(f"⚠️ No events for {location} – {room}")
+                continue
 
-            for ev in events:
-                summary = extract("SUMMARY", ev)
-                ref = re.search(r"(\d{3}-\d{3}-\d{3})", summary or "")
-                if not ref:
-                    continue
-                ref = ref.group(1)
+            for ev in events[1:]:
+                summary = extract_value(ev, "SUMMARY")
+                description = extract_value(ev, "DESCRIPTION")
 
-                dtstart = extract_dt("DTSTART", ev)
-                dtend   = extract_dt("DTEND", ev)
+                reservation_code = summary.strip()
 
-                ci = parse_date(dtstart)
-                co = parse_date(dtend)
+                dtstart = parse_ical_date(extract_datetime(ev, "DTSTART"))
+                dtend   = parse_ical_date(extract_datetime(ev, "DTEND"))
 
-                if not ci or not co:
-                    continue
-
-                if co < today:
-                    continue
-                if ci > max_ci:
-                    continue
-
-                desc = extract("DESCRIPTION", ev)
-                email_channel, email_personal = parse_detail(desc)
+                guest_name, guest_email, guest_phone = extract_guest_details(description)
 
                 rows.append({
-                    "reservation_code": ref,
-                    "guest_name": extract("SUMMARY", ev),
+                    "reservation_code": reservation_code,
                     "property_location": location,
                     "door_number": room,
-                    "check_in": ci.strftime("%Y-%m-%d"),
-                    "check_out": co.strftime("%Y-%m-%d"),
-                    "channel_email": email_channel,
-                    "personal_email": email_personal,
+                    "check_in": dtstart,
+                    "check_out": dtend,
+                    "guest_name": guest_name,
+                    "guest_email": guest_email,
+                    "guest_phone": guest_phone,
                 })
 
-    # Deduplicate by reservation_code (keep latest)
-    final = {}
-    for r in rows:
-        final[r["reservation_code"]] = r
+    # ALWAYS WRITE CSV (even if empty)
+    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "reservation_code", "property_location", "door_number",
+            "check_in", "check_out",
+            "guest_name", "guest_email", "guest_phone"
+        ])
+        writer.writeheader()
+        writer.writerows(rows)
 
-    os.makedirs("automation-data", exist_ok=True)
+    print(f"✅ Completed iCal fetch — {len(rows)} bookings written to {OUTPUT_FILE}")
 
-    with open(OUTPUT_PATH, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=final[next(iter(final))].keys())
-        w.writeheader()
-        w.writerows(final.values())
-
-    print(f"✔ Wrote {len(final)} bookings to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
     main()
