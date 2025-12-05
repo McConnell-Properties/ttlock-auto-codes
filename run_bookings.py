@@ -1,438 +1,360 @@
-# scripts/run_ttlock.py
-#
-# Create TTLock codes for eligible bookings based on:
-# - bookings.csv (from iCal via GAS → GitHub)
-# - payments_log.csv (from Gmail → GitHub)
-#
-# Rules:
-#   1) If there is ANY platform email (guest.booking.com / expediapartnercentral)
-#      → require a matching row in payments_log.csv.
-#   2) If there is NO platform email → always allowed (direct booking).
-#   3) Never re-attempt reservations that already have a successful code in ttlock_log.csv.
-#
-# Files (relative to repo root):
-#   automation-data/bookings.csv
-#   automation-data/payments_log.csv
-#   automation-data/ttlock_log.csv
-
-import csv
 import os
+import csv
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
+
+import pandas as pd
 
 import multi_property_lock_codes as tt
 
-
-# -----------------------------
-# FILE PATHS
-# -----------------------------
-BOOKINGS_CSV = os.path.join("automation-data", "bookings.csv")
-PAYMENTS_CSV = os.path.join("automation-data", "payments_log.csv")
-TTLOCK_LOG_CSV = os.path.join("automation-data", "ttlock_log.csv")
+BOOKINGS_PATH = "automation-data/bookings.csv"
+PAYMENTS_PATH = "automation-data/payments_log.csv"
+TTLOCK_LOG_PATH = "automation-data/ttlock_log.csv"
 
 
-# -----------------------------
-# HELPERS
-# -----------------------------
-def parse_gas_date(value):
+def clean_date_str(s: str) -> str:
     """
-    Parse the date format coming from GAS / Apps Script.
-    Examples we've seen:
-      "Fri Dec 05 2025 00:00:00 GMT+0000 (Greenwich Mean Time)"
-    We only care about the date, not time.
+    Clean the JS-style date string coming from Google Sheets CSV, e.g.:
+
+      'Wed Dec 10 2025 00:00:00 GMT+0000 (Greenwich Mean Time)'
+
+    We strip the trailing ' GMT+0000 (Greenwich Mean Time)' so pandas can parse it.
     """
-    if not value:
-        return None
-
-    s = str(value).strip()
-
-    # Try ISO style first (just in case)
-    try:
-        return datetime.fromisoformat(s)
-    except Exception:
-        pass
-
-    # Fallback: use the "Fri Dec 05 2025" prefix (first 15 chars)
-    # Format: "%a %b %d %Y"
-    try:
-        prefix = s[:15]
-        return datetime.strptime(prefix, "%a %b %d %Y")
-    except Exception:
-        print(f"⚠️ Could not parse date string: {s!r}")
-        return None
+    if not isinstance(s, str):
+        return s
+    return s.replace(" GMT+0000 (Greenwich Mean Time)", "")
 
 
-def load_payments():
+def load_paid_refs():
     """
-    Read payments_log.csv and return a set of reservation_code values
-    that are considered 'paid'.
-    payments_log.csv columns: timestamp, reservation_code, received_at
+    Load reservation codes that have a payment/pre-auth recorded in payments_log.csv.
+
+    payments_log.csv columns (from your Gmail step):
+        timestamp, reservation_code, received_at
     """
     paid = set()
-    if not os.path.exists(PAYMENTS_CSV):
-        print("ℹ️ payments_log.csv not found — treating all direct bookings as allowed, platforms as unpaid.")
+
+    if not os.path.exists(PAYMENTS_PATH):
+        print("ℹ️ payments_log.csv not found – treating all NON-platform bookings as allowed, "
+              "and platform bookings as unpaid.")
         return paid
 
-    with open(PAYMENTS_CSV, newline="", encoding="utf-8") as f:
+    with open(PAYMENTS_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            ref = (row.get("reservation_code") or "").strip()
+            ref = (row.get("reservation_code") or row.get("Reservation Code") or "").strip()
             if ref:
                 paid.add(ref)
 
-    print(f"💳 Loaded {len(paid)} paid reservation codes from payments_log.csv")
+    print(f"✔ Loaded {len(paid)} paid/pre-auth reservation refs from {PAYMENTS_PATH}")
     return paid
 
 
-def load_existing_successes():
+def load_existing_ttlock_refs():
     """
-    Read ttlock_log.csv and return a set of reservation_code values
-    for which at least one code was successfully created (code_created == 'yes').
-    """
-    success = set()
-    if not os.path.exists(TTLOCK_LOG_CSV):
-        print("ℹ️ ttlock_log.csv does not exist yet — no prior successes.")
-        return success
+    Load reservation codes that have already had TTLock codes attempted/created.
 
-    with open(TTLOCK_LOG_CSV, newline="", encoding="utf-8") as f:
+    This prevents trying to create codes again for the same reservation.
+    """
+    existing = set()
+
+    if not os.path.exists(TTLOCK_LOG_PATH):
+        print("ℹ️ No ttlock_log.csv yet – treating this as first run.")
+        return existing
+
+    with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            ref = (row.get("reservation_code") or "").strip()
-            created = (row.get("code_created") or "").strip().lower()
-            if ref and created == "yes":
-                success.add(ref)
+            ref = (row.get("reservation_code") or row.get("Reservation Code") or "").strip()
+            if ref:
+                existing.add(ref)
 
-    print(f"📒 Found {len(success)} reservations with existing successful codes in ttlock_log.csv")
-    return success
+    print(f"✔ Loaded {len(existing)} reservation refs already present in ttlock_log.csv")
+    return existing
 
 
-def load_and_merge_bookings():
+def aggregate_bookings():
     """
-    Load bookings.csv and merge rows by SUMMARY (reservation ref).
-    bookings.csv headers (from GAS):
-      Room, PRODID, VERSION, UID, DTSTAMP,
-      DTSTART (Check-in), DTEND (Check-out),
-      SUMMARY, DESCRIPTION, SEQUENCE,
-      Location, Guest Name, Email Address, Phone Number
+    Load bookings.csv, apply date filters, merge duplicate rows per reservation_code,
+    and return a list of "booking" dicts ready for TTLock logic.
 
-    Return a dict: ref -> merged booking
+    bookings.csv columns (as you provided):
+        Room, PRODID, VERSION, UID, DTSTAMP,
+        DTSTART (Check-in), DTEND (Check-out),
+        SUMMARY, DESCRIPTION, SEQUENCE,
+        Location, Guest Name, Email Address, Phone Number
     """
-    if not os.path.exists(BOOKINGS_CSV):
-        print(f"⚠️ {BOOKINGS_CSV} not found — cannot create TTLock codes.")
-        return {}
+    if not os.path.exists(BOOKINGS_PATH):
+        print(f"⚠️ {BOOKINGS_PATH} not found – aborting TTLock step.")
+        return []
 
-    with open(BOOKINGS_CSV, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
+    df = pd.read_csv(BOOKINGS_PATH, dtype=str)
+    df.columns = [c.strip() for c in df.columns]
 
-    print(f"📄 Loaded {len(rows)} rows from {BOOKINGS_CSV}")
+    # ---- Extract reservation_code from SUMMARY (e.g. 859-653-424) ----
+    def extract_ref(summary):
+        if not isinstance(summary, str):
+            return ""
+        m = re.search(r"(\d{3}-\d{3}-\d{3})", summary)
+        return m.group(1) if m else ""
 
-    merged = {}
+    df["reservation_code"] = df["SUMMARY"].apply(extract_ref)
+    df = df[df["reservation_code"] != ""].copy()
 
-    for row in rows:
-        ref = (row.get("SUMMARY") or "").strip()
-        if not ref:
-            continue
+    if df.empty:
+        print("ℹ️ No rows in bookings.csv with a reservation reference.")
+        return []
 
-        room = (row.get("Room") or "").strip()
-        location = (row.get("Location") or "").strip()
-        guest_name = (row.get("Guest Name") or "").strip()
-        email = (row.get("Email Address") or "").strip()
-        desc = (row.get("DESCRIPTION") or "").strip()
+    # ---- Parse check-in/check-out dates & apply the 30-day window rules ----
+    df["check_in"] = pd.to_datetime(
+        df["DTSTART (Check-in)"].apply(clean_date_str),
+        errors="coerce"
+    )
+    df["check_out"] = pd.to_datetime(
+        df["DTEND (Check-out)"].apply(clean_date_str),
+        errors="coerce"
+    )
 
-        checkin_raw = row.get("DTSTART (Check-in)")
-        checkout_raw = row.get("DTEND (Check-out)")
+    df = df.dropna(subset=["check_in", "check_out"])
 
-        ci = parse_gas_date(checkin_raw)
-        co = parse_gas_date(checkout_raw)
+    today = date.today()
+    horizon = today + timedelta(days=30)
 
-        existing = merged.get(ref)
-        if not existing:
-            existing = {
-                "ref": ref,
-                "room": room,
-                "location": location,
-                "guest_name": guest_name,
-                "check_in": ci,
-                "check_out": co,
-                "description": desc,
-                "channel_email": "",
-                "personal_email": "",
-                "has_platform": False,  # Booking.com / Expedia?
-            }
-        else:
-            # Update basic fields with the latest non-empty
-            if room:
-                existing["room"] = room
-            if location:
-                existing["location"] = location
-            if guest_name:
-                existing["guest_name"] = guest_name
-            if desc:
-                existing["description"] = desc
+    # Rule C: ignore check-out in past, and check-in > 30 days in future
+    mask = (df["check_out"].dt.date >= today) & (df["check_in"].dt.date <= horizon)
+    df = df[mask].copy()
 
-            # Merge date range
-            if ci and (existing["check_in"] is None or ci < existing["check_in"]):
-                existing["check_in"] = ci
-            if co and (existing["check_out"] is None or co > existing["check_out"]):
-                existing["check_out"] = co
+    if df.empty:
+        print("ℹ️ No bookings within the 30-day window.")
+        return []
 
-        # Classify email(s)
-        if email:
-            low = email.lower()
-            is_channel = "guest.booking.com" in low or "expediapartnercentral.com" in low
-            if is_channel:
-                existing["channel_email"] = email
-                existing["has_platform"] = True
-            else:
-                existing["personal_email"] = email
+    # ---- Detect whether a row is a "platform" row (Booking.com / Expedia) ----
+    def is_channel_row(desc, email):
+        text = (str(desc) + " " + str(email)).lower()
+        return ("@guest.booking.com" in text) or ("expediapartnercentral.com" in text)
 
-        merged[ref] = existing
+    df["is_channel_row"] = df.apply(
+        lambda r: is_channel_row(
+            r.get("DESCRIPTION", ""),
+            r.get("Email Address", "")
+        ),
+        axis=1
+    )
 
-    print(f"📦 Merged into {len(merged)} unique reservations by SUMMARY reference")
-    return merged
+    bookings = []
+
+    # ---- Merge duplicate rows per reservation_code ----
+    for ref, g in df.groupby("reservation_code"):
+        first = g.iloc[0]
+
+        location = first.get("Location", "") or ""
+        room = first.get("Room", "") or ""
+        guest = first.get("Guest Name", "") or ""
+        desc = first.get("DESCRIPTION", "") or ""
+
+        check_in = g["check_in"].min()
+        check_out = g["check_out"].max()
+
+        has_channel = g["is_channel_row"].any()
+
+        emails_raw = g["Email Address"].astype(str).tolist()
+        emails = [
+            e for e in emails_raw
+            if e and e.lower() != "nan"
+        ]
+        # Keep unique order
+        emails = list(dict.fromkeys(emails))
+
+        # Code: first 4 digits from reservation_code
+        digits = re.sub(r"\D", "", ref)
+        code = digits[:4] if len(digits) >= 4 else None
+
+        bookings.append({
+            "reservation_code": ref,
+            "guest_name": guest,
+            "property_location": location,
+            "door_number": room,
+            "check_in": check_in,
+            "check_out": check_out,
+            "has_channel": has_channel,
+            "description": desc,
+            "emails": ";".join(emails),
+            "code": code,
+        })
+
+    print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
+    return bookings
 
 
-def generate_code_from_ref(ref):
-    """
-    Generate a 4-digit code from reservation reference by stripping non-digits.
-    """
-    digits = re.sub(r"\D", "", ref or "")
-    if len(digits) < 4:
-        return None
-    return digits[:4]
-
-
-# -----------------------------
-# MAIN TTLOCK RUNNER
-# -----------------------------
 def main():
-    print("=== TTLock Booking Automation ===")
+    print("=== TTLock Automation Start ===")
 
-    # 1) Ensure TTLock CLIENT_ID is configured
+    # Initialise TTLock with CLIENT_ID from environment
     client_id = os.getenv("TTLOCK_CLIENT_ID")
     if not client_id:
-        print("❌ TTLOCK_CLIENT_ID not set in environment — aborting.")
+        print("❌ TTLOCK_CLIENT_ID not set in environment – cannot proceed.")
         return
-
-    # Initialise ttlock helper (sets global CLIENT_ID)
     tt.initialize_ttlock(client_id)
 
-    # 2) Load payments and existing successes
-    paid_refs = load_payments()
-    already_success = load_existing_successes()
+    paid_refs = load_paid_refs()
+    already_coded_refs = load_existing_ttlock_refs()
+    bookings = aggregate_bookings()
 
-    # 3) Load bookings and merge duplicates
-    merged = load_and_merge_bookings()
-    if not merged:
-        print("ℹ️ No merged bookings to process.")
+    if not bookings:
+        print("ℹ️ No eligible bookings found – nothing to do.")
         return
 
-    today = datetime.utcnow().date()
-    max_check_in = today + timedelta(days=30)
+    log_rows = []
 
-    log_entries = []
-
-    processed_count = 0
-    eligible_count = 0
-    skipped_paid_logic = 0
-    skipped_past = 0
-    skipped_future = 0
-    skipped_existing = 0
-
-    for ref, booking in merged.items():
-        processed_count += 1
-
-        room = booking["room"]
-        location = booking["location"]
+    for booking in bookings:
+        ref = booking["reservation_code"]
         guest_name = booking["guest_name"]
-        ci = booking["check_in"]
-        co = booking["check_out"]
-        has_platform = booking["has_platform"]
+        location = booking["property_location"]
+        room_name = booking["door_number"]
+        has_channel = booking["has_channel"]
+        code = booking["code"]
+        check_in = booking["check_in"]
+        check_out = booking["check_out"]
 
-        # Date sanity
-        if not ci or not co:
-            print(f"⚠️ Skipping {ref}: missing check-in/check-out")
+        print(f"\n📋 Evaluating reservation {ref} for guest '{guest_name}'")
+        print(f"   Property: {location}, Room: {room_name}")
+        print(f"   Check-in: {check_in}, Check-out: {check_out}")
+        print(f"   Platform booking? {'YES' if has_channel else 'NO'}")
+
+        # Rule D: skip if this reservation was already processed in ttlock_log.csv
+        if ref in already_coded_refs:
+            print(f"⏭️ Skipping {ref} – already present in ttlock_log.csv")
             continue
 
-        ci_date = ci.date()
-        co_date = co.date()
-
-        # Skip past check-outs
-        if co_date < today:
-            skipped_past += 1
-            print(f"⏩ Skipping {ref}: checkout in the past ({co_date})")
-            continue
-
-        # Skip very far future check-ins (> 30 days)
-        if ci_date > max_check_in:
-            skipped_future += 1
-            print(f"⏩ Skipping {ref}: check-in beyond 30 days ({ci_date})")
-            continue
-
-        # Skip if we already successfully created a code in a previous run
-        if ref in already_success:
-            skipped_existing += 1
-            print(f"⏩ Skipping {ref}: already has successful code in ttlock_log.csv")
-            continue
-
-        # Eligibility by platform / payment
+        # Rule A & B: deposit/pre-auth logic
         is_paid = ref in paid_refs
-        needs_deposit = has_platform
-
-        if needs_deposit and not is_paid:
-            skipped_paid_logic += 1
-            print(f"⏩ Skipping {ref}: platform booking but NO payment found.")
+        if has_channel and not is_paid:
+            print(f"⏭️ Skipping {ref} – platform booking with NO payment/pre-auth yet.")
             continue
+        else:
+            if has_channel:
+                print(f"✅ {ref} is platform booking WITH payment – allowed.")
+            else:
+                print(f"✅ {ref} is non-platform booking – allowed without payment record.")
 
-        # At this point: either direct booking, or platform+paid
-        eligible_count += 1
-
-        # Validate property & room mapping
-        if location not in tt.PROPERTIES:
-            print(f"⚠️ Skipping {ref}: unknown property location '{location}'")
-            continue
-
-        property_cfg = tt.PROPERTIES[location]
-
-        # Room key in PROPERTIES is like 'Room 1', 'Room 2' etc.
-        door_number = room  # Room column already looks like 'Room 2'
-        room_lock_id = property_cfg.get("ROOM_LOCK_IDS", {}).get(door_number)
-        front_lock_id = property_cfg.get("FRONT_DOOR_LOCK_ID")
-
-        if not room_lock_id and not front_lock_id:
-            print(f"⚠️ Skipping {ref}: no lock IDs configured for {location}, {door_number}")
-            continue
-
-        # Generate code from ref
-        code = generate_code_from_ref(ref)
         if not code:
-            print(f"⚠️ Skipping {ref}: cannot derive 4-digit code from reference '{ref}'")
+            print(f"⚠️ {ref}: could not derive a 4-digit code from reservation reference – skipping.")
             continue
 
-        print(f"\n📋 Processing eligible reservation {ref} for {guest_name}")
-        print(f"   Property: {location}, Room: {door_number}")
-        print(f"   Check-in: {ci_date}, Check-out: {co_date}")
-        print(f"   Platform? {needs_deposit}, Paid? {is_paid}, Code: {code}")
+        # Map property + room to PROPERTIES config
+        if location not in tt.PROPERTIES:
+            print(f"⚠️ {ref}: unknown property_location '{location}' – skipping.")
+            continue
 
-        start_ms = int(ci.replace(hour=15, minute=0, second=0, microsecond=0).timestamp() * 1000)
-        end_ms = int(co.replace(hour=11, minute=0, second=0, microsecond=0).timestamp() * 1000)
+        prop_conf = tt.PROPERTIES[location]
+
+        start_ms = int(check_in.timestamp() * 1000)
+        end_ms = int(check_out.timestamp() * 1000)
 
         any_success = False
 
-        # FRONT DOOR
-        if front_lock_id:
-            print(f"🚪 Attempting front door code for {location} (lock {front_lock_id})")
-            ok, resp = tt.create_lock_code_simple(
-                front_lock_id,
+        # ---- 1. Front door code ----
+        front_door_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
+        if front_door_lock_id:
+            print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id})")
+            success, resp = tt.create_lock_code_simple(
+                front_door_lock_id,
                 code,
                 guest_name,
                 start_ms,
                 end_ms,
                 f"Front Door ({location})",
-                ref,
+                ref
             )
-            if ok:
-                any_success = True
-                log_entries.append({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reservation_code": ref,
-                    "guest_name": guest_name,
-                    "property_location": location,
-                    "door_number": "Front Door",
-                    "lock_type": "front_door",
-                    "code_created": "yes",
-                    "ttlock_response": "success",
-                })
-            else:
-                log_entries.append({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reservation_code": ref,
-                    "guest_name": guest_name,
-                    "property_location": location,
-                    "door_number": "Front Door",
-                    "lock_type": "front_door",
-                    "code_created": "no",
-                    "ttlock_response": str(resp),
-                })
 
-        # ROOM DOOR
+            log_rows.append({
+                "timestamp": datetime.utcnow().isoformat(),
+                "reservation_code": ref,
+                "guest_name": guest_name,
+                "property_location": location,
+                "door_number": "Front Door",
+                "lock_type": "front_door",
+                "code_created": "yes" if success else "no",
+                "ttlock_response": str(resp),
+            })
+
+            if success:
+                any_success = True
+                print(f"✅ Front door code CREATED for {ref}")
+            else:
+                print(f"❌ Front door code FAILED for {ref}")
+
+        else:
+            print(f"ℹ️ No front door configured for property '{location}'")
+
+        # ---- 2. Room door code ----
+        room_lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
         if room_lock_id:
-            print(f"🚪 Attempting room {door_number} code for {location} (lock {room_lock_id})")
-            ok, resp = tt.create_lock_code_simple(
+            print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id})")
+            success, resp = tt.create_lock_code_simple(
                 room_lock_id,
                 code,
                 guest_name,
                 start_ms,
                 end_ms,
-                f"{door_number} ({location})",
-                ref,
+                f"{room_name} ({location})",
+                ref
             )
-            if ok:
+
+            log_rows.append({
+                "timestamp": datetime.utcnow().isoformat(),
+                "reservation_code": ref,
+                "guest_name": guest_name,
+                "property_location": location,
+                "door_number": room_name,
+                "lock_type": "room",
+                "code_created": "yes" if success else "no",
+                "ttlock_response": str(resp),
+            })
+
+            if success:
                 any_success = True
-                log_entries.append({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reservation_code": ref,
-                    "guest_name": guest_name,
-                    "property_location": location,
-                    "door_number": door_number,
-                    "lock_type": "room",
-                    "code_created": "yes",
-                    "ttlock_response": "success",
-                })
+                print(f"✅ Room code CREATED for {ref}")
             else:
-                log_entries.append({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reservation_code": ref,
-                    "guest_name": guest_name,
-                    "property_location": location,
-                    "door_number": door_number,
-                    "lock_type": "room",
-                    "code_created": "no",
-                    "ttlock_response": str(resp),
-                })
+                print(f"❌ Room code FAILED for {ref}")
+        else:
+            print(f"⚠️ No lock configured for room '{room_name}' at '{location}'")
+            print(f"   Known rooms: {list(prop_conf.get('ROOM_LOCK_IDS', {}).keys())}")
 
         if any_success:
-            print(f"✅ Completed reservation {ref} — at least one code created.")
+            print(f"🎉 Completed TTLock programming for {ref} – at least one lock succeeded.")
         else:
-            print(f"❌ Reservation {ref} — no lock codes were successfully created.")
+            print(f"❌ No successful TTLock codes created for {ref}.")
 
-    # -----------------------------
-    # WRITE / APPEND LOG FILE
-    # -----------------------------
-    if log_entries:
-        os.makedirs(os.path.dirname(TTLOCK_LOG_CSV), exist_ok=True)
-        file_exists = os.path.exists(TTLOCK_LOG_CSV)
+    # ---- Write / append ttlock_log.csv ----
+    if log_rows:
+        existing_rows = []
 
-        with open(TTLOCK_LOG_CSV, "a", newline="", encoding="utf-8") as log_file:
-            fieldnames = [
-                "timestamp",
-                "reservation_code",
-                "guest_name",
-                "property_location",
-                "door_number",
-                "lock_type",
-                "code_created",
-                "ttlock_response",
-            ]
-            writer = csv.DictWriter(log_file, fieldnames=fieldnames)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerows(log_entries)
+        if os.path.exists(TTLOCK_LOG_PATH):
+            with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                existing_rows = list(reader)
 
-        print(f"\n📝 Appended {len(log_entries)} entries to {TTLOCK_LOG_CSV}")
+        fieldnames = [
+            "timestamp",
+            "reservation_code",
+            "guest_name",
+            "property_location",
+            "door_number",
+            "lock_type",
+            "code_created",
+            "ttlock_response",
+        ]
+
+        with open(TTLOCK_LOG_PATH, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in existing_rows + log_rows:
+                writer.writerow(row)
+
+        print(f"\n📝 Appended {len(log_rows)} new entries into {TTLOCK_LOG_PATH}")
     else:
-        print("ℹ️ No log entries to write.")
-
-    # Summary
-    print("\n=== TTLock run summary ===")
-    print(f"Total merged reservations: {processed_count}")
-    print(f"Eligible (after date + payment rules): {eligible_count}")
-    print(f"Skipped — past checkout: {skipped_past}")
-    print(f"Skipped — >30 days ahead: {skipped_future}")
-    print(f"Skipped — already had success: {skipped_existing}")
-    print(f"Skipped — platform without payment: {skipped_paid_logic}")
-    print("=== End of run ===")
+        print("\nℹ️ No new TTLock log entries to write.")
 
 
 if __name__ == "__main__":
