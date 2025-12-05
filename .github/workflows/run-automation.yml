@@ -10,15 +10,20 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # allow updating CSV files
+      contents: write     # Needed for pushing CSV changes
 
     steps:
+      # ---------------------------
+      # CHECKOUT REPO
+      # ---------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # IMPORTANT: allows pull --rebase
 
-      - name: Ensure automation-data folder exists
-        run: mkdir -p automation-data
-
+      # ---------------------------
+      # PYTHON SETUP
+      # ---------------------------
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -28,6 +33,9 @@ jobs:
         run: |
           pip install pandas requests
 
+      # ---------------------------
+      # ENV VARIABLES
+      # ---------------------------
       - name: Export environment variables
         run: |
           echo "GMAIL_USER=${{ secrets.GMAIL_USER }}" >> $GITHUB_ENV
@@ -35,9 +43,39 @@ jobs:
           echo "TTLOCK_CLIENT_ID=${{ secrets.TTLOCK_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TTLOCK_CLIENT_SECRET=${{ secrets.TTLOCK_CLIENT_SECRET }}" >> $GITHUB_ENV
 
-      - name: Run Python automation
-        run: python scripts/main.py
+      # ---------------------------
+      # STEP 1 — Build bookings.csv from iCal
+      # ---------------------------
+      - name: Run iCal fetcher → bookings.csv
+        run: python scripts/fetch_ical.py
 
+      # ---------------------------
+      # STEP 2 — Read Gmail preauth → payments_log.csv
+      # ---------------------------
+      - name: Sync Gmail → payments_log.csv
+        run: python scripts/read_preauth_gmail.py
+
+      # ---------------------------
+      # STEP 3 — Run TTLock automation for new bookings
+      # ---------------------------
+      - name: Run TTLock Automation
+        run: python scripts/run_ttlock.py
+
+      # ---------------------------
+      # STEP 4 — Parse TTLock logs → update ttlock_log.csv
+      # ---------------------------
+      - name: Parse TTLock logs
+        run: python scripts/ttlock_log_parser.py
+
+      # ---------------------------
+      # STEP 5 — (Optional) Send summary to Google Sheets
+      # ---------------------------
+      - name: Update Google Sheets
+        run: python scripts/update_google_sheets.py || true
+
+      # ---------------------------
+      # COMMIT + PUSH ANY UPDATED CSV FILES
+      # ---------------------------
       - name: Commit updated CSV files
         run: |
           git config --local user.email "actions@github.com"
@@ -48,6 +86,12 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
+            echo "Pulling latest changes before pushing…"
+            git pull --rebase
+
+            echo "Committing updates…"
             git commit -m "Update automation CSV logs"
+
+            echo "Pushing to GitHub…"
             git push
           fi
