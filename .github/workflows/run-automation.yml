@@ -70,8 +70,7 @@ jobs:
       # ---------------------------
       # STEP 4 — UPDATE GOOGLE SHEETS (OPTIONAL)
       # ---------------------------
-      - name: Update Google Sheets
-        run: python scripts/update_google_sheets.py || true
+      
 
       # ===========================================================
       # FINAL SAFE COMMIT — NEVER FAILS OR REJECTS
