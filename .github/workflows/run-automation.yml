@@ -3,7 +3,7 @@ name: Run Full Automation Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"   # every 5 minutes (safe)
+    - cron: "*/5 * * * *"   # every 5 minutes
 
 jobs:
   automation:
@@ -31,7 +31,6 @@ jobs:
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
 
       - name: Run Python automation
-        working-directory: scripts
         run: python scripts/main.py
 
       - name: Commit updated CSV files
