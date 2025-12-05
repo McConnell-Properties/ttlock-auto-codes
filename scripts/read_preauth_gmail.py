@@ -13,10 +13,8 @@ def read_and_append():
     mail = imaplib.IMAP4_SSL("imap.gmail.com")
     mail.login(GMAIL_USER, GMAIL_APP_PASSWORD)
 
-    # THE REQUIRED FIX:
-    mail.select("inbox")   # ← This must be done BEFORE search()
+    mail.select("inbox")   # REQUIRED for search()
 
-    # Search for all messages
     status, data = mail.search(None, "ALL")
     if status != "OK":
         print("❌ Could not search inbox")
@@ -38,12 +36,9 @@ def read_and_append():
         subject = msg.get("Subject", "")
         date_received = msg.get("Date", "")
 
-        # Only process the actual deposit confirmation emails
         if "Pre-authorisation confirmed" not in subject:
             continue
 
-        # Extract reference number from subject
-        # Assumes ref appears like 123-456-789
         import re
         match = re.search(r"(\d{3}-\d{3}-\d{3})", subject)
         if not match:
@@ -51,7 +46,6 @@ def read_and_append():
 
         ref = match.group(1)
 
-        # Convert Gmail datetime into ISO format
         try:
             dt = email.utils.parsedate_to_datetime(date_received)
             received_iso = dt.isoformat()
@@ -64,14 +58,17 @@ def read_and_append():
             "received_at": received_iso
         })
 
-    # Load existing CSV (if exists)
     csv_path = "../automation-data/payments_log.csv"
-    if os.path.exists(csv_path):
-        existing = pd.read_csv(csv_path)
+
+    # SAFE LOADING (FIX)
+    if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
+        try:
+            existing = pd.read_csv(csv_path)
+        except Exception:
+            existing = pd.DataFrame(columns=["timestamp", "reservation_code", "received_at"])
     else:
         existing = pd.DataFrame(columns=["timestamp", "reservation_code", "received_at"])
 
-    # Append new rows
     if rows:
         new_df = pd.DataFrame(rows)
         combined = pd.concat([existing, new_df], ignore_index=True)
