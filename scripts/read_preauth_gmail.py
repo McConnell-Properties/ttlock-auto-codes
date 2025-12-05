@@ -1,33 +1,34 @@
 import imaplib
 import email
 import pandas as pd
-import os
 from datetime import datetime
+import os
 
-GMAIL_USER = os.environ.get("GMAIL_USER")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+
+CSV_PATH = "automation-data/payments_log.csv"
+
 
 def read_and_append():
     print("Step 1: Syncing Gmail → payments_log.csv …")
 
     mail = imaplib.IMAP4_SSL("imap.gmail.com")
     mail.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+    mail.select("inbox")
 
-    mail.select("inbox")   # REQUIRED for search()
-
-    status, data = mail.search(None, "ALL")
+    status, data = mail.search(None, 'ALL')
     if status != "OK":
-        print("❌ Could not search inbox")
-        mail.logout()
+        print("IMAP search failed.")
         return
 
-    email_ids = data[0].split()
-    print(f"Found {len(email_ids)} email(s) to scan.")
+    ids = data[0].split()
+    print(f"Found {len(ids)} email(s) to scan.")
 
     rows = []
 
-    for eid in email_ids:
-        status, msg_data = mail.fetch(eid, "(RFC822)")
+    for num in ids:
+        status, msg_data = mail.fetch(num, "(RFC822)")
         if status != "OK":
             continue
 
@@ -39,42 +40,38 @@ def read_and_append():
         if "Pre-authorisation confirmed" not in subject:
             continue
 
-        import re
-        match = re.search(r"(\d{3}-\d{3}-\d{3})", subject)
-        if not match:
+        # extract reservation ID (###-###-###)
+        ref = ""
+        for part in subject.split():
+            if len(part) == 11 and part[3] == "-" and part[7] == "-":
+                ref = part
+                break
+
+        if not ref:
             continue
 
-        ref = match.group(1)
-
-        try:
-            dt = email.utils.parsedate_to_datetime(date_received)
-            received_iso = dt.isoformat()
-        except:
-            received_iso = datetime.utcnow().isoformat()
-
+        received_at = datetime.now().isoformat()
         rows.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": received_at,
             "reservation_code": ref,
-            "received_at": received_iso
+            "received_at": received_at
         })
 
-    csv_path = "../automation-data/payments_log.csv"
-
-    # SAFE LOADING (FIX)
-    if os.path.exists(csv_path) and os.path.getsize(csv_path) > 0:
-        try:
-            existing = pd.read_csv(csv_path)
-        except Exception:
-            existing = pd.DataFrame(columns=["timestamp", "reservation_code", "received_at"])
-    else:
-        existing = pd.DataFrame(columns=["timestamp", "reservation_code", "received_at"])
-
-    if rows:
-        new_df = pd.DataFrame(rows)
-        combined = pd.concat([existing, new_df], ignore_index=True)
-        combined.to_csv(csv_path, index=False)
-        print(f"✔ Logged {len(rows)} new payment confirmations.")
-    else:
-        print("No new matching emails found.")
-
     mail.logout()
+
+    if not rows:
+        print("No new payment confirmations found.")
+        return
+
+    df_new = pd.DataFrame(rows)
+
+    # Load old CSV (if exists)
+    try:
+        df_old = pd.read_csv(CSV_PATH)
+    except:
+        df_old = pd.DataFrame(columns=df_new.columns)
+
+    df_all = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates()
+
+    df_all.to_csv(CSV_PATH, index=False)
+    print(f"✔ Logged {len(rows)} new payment confirmations.")
