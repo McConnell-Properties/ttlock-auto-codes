@@ -3,45 +3,47 @@ name: Run Full Automation Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes, adjust as needed
+    - cron: "*/5 * * * *"   # every 5 minutes (safe)
 
 jobs:
-  run-automation:
+  automation:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # allow updating CSV files
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install python dependencies
         run: |
-          pip install --upgrade pip
-          pip install \
-            google-api-python-client \
-            google-auth \
-            google-auth-oauthlib \
-            google-auth-httplib2 \
-            pandas \
-            gspread \
-            oauth2client
-
-      - name: Create service account credentials file
-        run: |
-          echo "${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}" > service_account.json
+          pip install pandas
 
       - name: Export environment variables
         run: |
           echo "GMAIL_USER=${{ secrets.GMAIL_USER }}" >> $GITHUB_ENV
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> $GITHUB_ENV
-          echo "SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}" >> $GITHUB_ENV
-          echo "GOOGLE_APPLICATION_CREDENTIALS=service_account.json" >> $GITHUB_ENV
 
-      - name: Run automation pipeline (main.py)
+      - name: Run Python automation
         working-directory: scripts
+        run: python main.py
+
+      - name: Commit updated CSV files
         run: |
-          python main.py
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+
+          git add automation-data/*.csv || true
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update automation CSV logs"
+            git push
+          fi
