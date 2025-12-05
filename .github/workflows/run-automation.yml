@@ -13,6 +13,7 @@ jobs:
       contents: write
 
     steps:
+
       # ---------------------------
       # CHECKOUT
       # ---------------------------
@@ -43,38 +44,37 @@ jobs:
           echo "TTLOCK_CLIENT_ID=${{ secrets.TTLOCK_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TTLOCK_CLIENT_SECRET=${{ secrets.TTLOCK_CLIENT_SECRET }}" >> $GITHUB_ENV
 
-      # ---------------------------
-      # STEP 1 — BOOKINGS VIA iCal
-      # ---------------------------
-      - name: Build bookings.csv from iCal
-        run: python scripts/fetch_ical.py
+      # ----------------------------------------------------------
+      # STEP 1 — REMOVE OLD FETCH_ICAL STEP (GAS now handles this)
+      # ----------------------------------------------------------
+      # (NO LONGER EXISTS)
 
       # ---------------------------
-      # STEP 2 — PAYMENTS VIA GMAIL
+      # STEP 1 — PAYMENTS VIA GMAIL
       # ---------------------------
       - name: Sync Gmail → payments_log.csv
         run: python scripts/read_preauth_gmail.py
 
       # ---------------------------
-      # STEP 3 — RUN TTLOCK AUTOMATION
+      # STEP 2 — RUN TTLOCK AUTOMATION
       # ---------------------------
       - name: Run TTLock Automation
         run: python scripts/run_ttlock.py
 
       # ---------------------------
-      # STEP 4 — PARSE TTLOCK LOGS
+      # STEP 3 — PARSE TTLOCK LOGS
       # ---------------------------
       - name: Parse TTLock logs
         run: python scripts/ttlock_log_parser.py
 
       # ---------------------------
-      # STEP 5 — UPDATE GOOGLE SHEETS (OPTIONAL)
+      # STEP 4 — UPDATE GOOGLE SHEETS (OPTIONAL)
       # ---------------------------
       - name: Update Google Sheets
         run: python scripts/update_google_sheets.py || true
 
       # ===========================================================
-      # FINAL FIXED — COMMIT WITHOUT EVER FAILING
+      # FINAL SAFE COMMIT — NEVER FAILS OR REJECTS
       # ===========================================================
       - name: Stage CSV changes
         run: |
@@ -95,7 +95,7 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
 
-          # Sync branch with remote WITHOUT removing staged CSV updates
+          # Sync with remote but keep CSV staging
           git fetch origin main
           git reset --soft origin/main
 
