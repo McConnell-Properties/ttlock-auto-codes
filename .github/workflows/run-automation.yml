@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Python automation
         working-directory: scripts
-        run: python main.py
+        run: python scripts/main.py
 
       - name: Commit updated CSV files
         run: |
