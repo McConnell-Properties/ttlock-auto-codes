@@ -71,6 +71,7 @@ jobs:
       # ---------------------------
       # STEP 4 — UPDATE GOOGLE SHEETS (OPTIONAL)
       # ---------------------------
+      # (we skip this for now)
 
       # ===========================================================
       # FINAL SAFE COMMIT — NEVER FAILS OR REJECTS
