@@ -10,9 +10,9 @@ PAYMENTS = "automation-data/payments_log.csv"
 TTLOG   = "automation-data/ttlock_log.csv"
 OUTPUT  = "automation-data/reservation_status.csv"
 
-# ---------------------------------
+# -----------------------------
 # Parse date safely
-# ---------------------------------
+# -----------------------------
 def parse_date(x):
     try:
         return pd.to_datetime(x, utc=True, dayfirst=False)
@@ -22,6 +22,9 @@ def parse_date(x):
 
 def main():
 
+    # -----------------------------
+    # LOAD INPUT FILES
+    # -----------------------------
     print("📄 Loading bookings.csv…")
     bookings = pd.read_csv(BOOKINGS)
 
@@ -32,40 +35,54 @@ def main():
     ttlog = pd.read_csv(TTLOG) if os.path.exists(TTLOG) else pd.DataFrame(columns=["reservation_code"])
 
 
-    # ---------------------------------
+    # -----------------------------
     # NORMALISE COLUMN NAMES
-    # ---------------------------------
+    # -----------------------------
     bookings.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
-    # After normalization, your actual date columns are:
-    # dtstart_(check-in)
-    # dtend_(check-out)
+    # Your actual date columns AFTER normalisation:
+    #   dtstart_(check-in)
+    #   dtend_(check-out)
+    #
+    # We map them to usable standard names:
+    bookings = bookings.rename(columns={
+        "dtstart_(check-in)": "check_in",
+        "dtend_(check-out)": "check_out",
+        "email_address": "email_address",  # already good
+        "guest_name": "guest_name",        # already good
+        "location": "property_location",   # optional rename
+        "room": "door_number",
+    })
 
-    # ---------------------------------
-    # Extract reservation_code
-    # ---------------------------------
-    print("🔍 Extracting reservation_code...")
+    # -----------------------------
+    # EXTRACT RESERVATION CODE (###-###-###)
+    # -----------------------------
+    print("🔍 Extracting reservation_code from summary…")
     bookings["reservation_code"] = bookings["summary"].astype(str).str.extract(r"(\d{3}-\d{3}-\d{3})")
 
-    # ---------------------------------
-    # Identify platform bookings (need deposit)
-    # ---------------------------------
+
+    # -----------------------------
+    # PAYMENT REQUIREMENT
+    # -----------------------------
+    print("🔍 Identifying Booking.com/Expedia reservations needing deposits…")
     bookings["needs_deposit"] = bookings["description"].astype(str).str.contains(
         "booking.com|expedia", case=False, na=False
     )
 
-    # ---------------------------------
-    # Parse check-in / check-out dates correctly
-    # ---------------------------------
-    bookings["check_in"]  = bookings["dtstart_(check-in)"].apply(parse_date)
-    bookings["check_out"] = bookings["dtend_(check-out)"].apply(parse_date)
+
+    # -----------------------------
+    # PARSE CHECK-IN / CHECK-OUT DATES
+    # -----------------------------
+    bookings["check_in"]  = bookings["check_in"].apply(parse_date)
+    bookings["check_out"] = bookings["check_out"].apply(parse_date)
+
 
     today = datetime.utcnow()
     cutoff = today + timedelta(days=30)
 
-    # ---------------------------------
-    # Filter relevant bookings
-    # ---------------------------------
+    # -----------------------------
+    # FILTER VALID BOOKINGS
+    # -----------------------------
     valid = bookings[
         (bookings["check_out"] >= today) &
         (bookings["check_in"] <= cutoff)
@@ -73,9 +90,10 @@ def main():
 
     print(f"➡ {len(valid)} valid upcoming/current reservations found.")
 
-    # ---------------------------------
+
+    # -----------------------------
     # PAYMENT STATUS
-    # ---------------------------------
+    # -----------------------------
     paid_refs = set(payments["ref"].astype(str)) if "ref" in payments else set()
     valid["payment_received"] = valid["reservation_code"].isin(paid_refs)
 
@@ -84,19 +102,21 @@ def main():
         axis=1
     )
 
-    # ---------------------------------
+
+    # -----------------------------
     # TTLOCK STATUS
-    # ---------------------------------
+    # -----------------------------
     done_refs = set(ttlog["reservation_code"].astype(str)) if "reservation_code" in ttlog else set()
     valid["lock_set"] = valid["reservation_code"].isin(done_refs)
 
-    # ---------------------------------
-    # FINAL OUTPUT COLUMNS
-    # ---------------------------------
+
+    # -----------------------------
+    # OUTPUT COLUMNS
+    # -----------------------------
     cols = [
         "reservation_code",
-        "room",
-        "location",
+        "property_location",
+        "door_number",
         "guest_name",
         "email_address",
         "check_in",
@@ -110,11 +130,12 @@ def main():
 
     final = valid[[c for c in cols if c in valid.columns]].copy()
 
-    # ---------------------------------
-    # WRITE OUTPUT CSV
-    # ---------------------------------
+
+    # -----------------------------
+    # WRITE OUTPUT
+    # -----------------------------
     final.to_csv(OUTPUT, index=False)
-    print(f"✅ reservation_status.csv written to {OUTPUT} with {len(final)} rows.")
+    print(f"✅ reservation_status.csv written to {OUTPUT}")
 
 
 if __name__ == "__main__":
