@@ -1,13 +1,29 @@
 import imaplib
 import email
+from email.header import decode_header
 import pandas as pd
 from datetime import datetime
 import os
+import re
 
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 
 CSV_PATH = "automation-data/payments_log.csv"
+
+
+def decode_subject(raw_subject):
+    """Decode Gmail subject reliably."""
+    decoded = decode_header(raw_subject)
+    subject_str = ""
+
+    for part, encoding in decoded:
+        if isinstance(part, bytes):
+            subject_str += part.decode(encoding or "utf-8", errors="ignore")
+        else:
+            subject_str += part
+
+    return subject_str
 
 
 def read_and_append():
@@ -34,27 +50,31 @@ def read_and_append():
 
         msg = email.message_from_bytes(msg_data[0][1])
 
-        subject = msg.get("Subject", "")
+        raw_subject = msg.get("Subject", "")
+        subject = decode_subject(raw_subject)
+        subject_lower = subject.lower()
+
         date_received = msg.get("Date", "")
 
-        if "Pre-authorisation confirmed" not in subject:
+        # Match pre-authorisation confirmed (case-insensitive)
+        if "pre-authorisation confirmed" not in subject_lower:
             continue
 
-        # extract reservation ID (###-###-###)
-        ref = ""
-        for part in subject.split():
-            if len(part) == 11 and part[3] == "-" and part[7] == "-":
-                ref = part
-                break
-
-        if not ref:
+        # extract reservation ID using regex
+        ref_match = re.search(r"\d{3}-\d{3}-\d{3}", subject)
+        if not ref_match:
+            print(f"⚠️ No reservation code found in subject: {subject}")
             continue
+
+        ref = ref_match.group(0)
 
         received_at = datetime.now().isoformat()
+
         rows.append({
             "timestamp": received_at,
             "reservation_code": ref,
-            "received_at": received_at
+            "received_at": received_at,
+            "subject": subject
         })
 
     mail.logout()
