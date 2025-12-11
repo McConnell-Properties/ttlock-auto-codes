@@ -1,1 +1,1 @@
-reservation_code,room,location,guest_name,email_address,check_in,check_out,needs_deposit,payment_received,outstanding_payment,lock_set,description
+reservation_code,property_location,door_number,guest_name,email_address,check_in,check_out,needs_deposit,payment_received,outstanding_payment,lock_set,description
