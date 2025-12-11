@@ -3,22 +3,27 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+import re
 
 BOOKINGS = "automation-data/bookings.csv"
 PAYMENTS = "automation-data/payments_log.csv"
 TTLOG   = "automation-data/ttlock_log.csv"
 OUTPUT  = "automation-data/reservation_status.csv"
 
+# -----------------------------
+# Parse date safely
+# -----------------------------
 def parse_date(x):
     try:
-        return pd.to_datetime(x, dayfirst=False, utc=True)
+        return pd.to_datetime(x, utc=True, dayfirst=False)
     except:
         return pd.NaT
+
 
 def main():
 
     # -----------------------------
-    # LOAD INPUTS
+    # LOAD INPUT FILES
     # -----------------------------
     print("📄 Loading bookings.csv…")
     bookings = pd.read_csv(BOOKINGS)
@@ -31,19 +36,39 @@ def main():
 
 
     # -----------------------------
-    # NORMALISE COLUMNS
+    # NORMALISE COLUMN NAMES
     # -----------------------------
     bookings.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
-    # Identify reference code from SUMMARY (###-###-###)
+    # Rename key columns to consistent names
+    rename_map = {
+        "check-in_date": "check_in",
+        "check-out_date": "check_out",
+        "email": "email_address",
+    }
+    bookings.rename(columns=rename_map, inplace=True)
+
+    # -----------------------------
+    # EXTRACT RESERVATION CODE (###-###-###)
+    # -----------------------------
+    print("🔍 Extracting reservation_code from summary…")
     bookings["reservation_code"] = bookings["summary"].astype(str).str.extract(r"(\d{3}-\d{3}-\d{3})")
 
-    # Identify Booking.com or Expedia reservations
-    bookings["needs_deposit"] = bookings["description"].str.contains("guest.booking.com|expedia", case=False, na=False)
 
-    # Convert check-in / check-out
-    bookings["check_in"]  = bookings["dtstart_(check-in)"].apply(parse_date)
-    bookings["check_out"] = bookings["dtend_(check-out)"].apply(parse_date)
+    # -----------------------------
+    # PAYMENT REQUIREMENT
+    # -----------------------------
+    print("🔍 Identifying Booking.com/Expedia reservations needing deposits…")
+    bookings["needs_deposit"] = bookings["description"].astype(str).str.contains(
+        "booking.com|expedia", case=False, na=False
+    )
+
+
+    # -----------------------------
+    # PARSE CHECK-IN / CHECK-OUT DATES
+    # -----------------------------
+    bookings["check_in"]  = bookings["check_in"].apply(parse_date)
+    bookings["check_out"] = bookings["check_out"].apply(parse_date)
 
     today = datetime.utcnow()
     cutoff = today + timedelta(days=30)
@@ -62,28 +87,29 @@ def main():
     # -----------------------------
     # PAYMENT STATUS
     # -----------------------------
-    paid_refs = set(payments["ref"].astype(str).unique()) if "ref" in payments else set()
+    paid_refs = set(payments["ref"].astype(str)) if "ref" in payments else set()
     valid["payment_received"] = valid["reservation_code"].isin(paid_refs)
 
-    # Outstanding payment = deposit required AND not received
     valid["outstanding_payment"] = valid.apply(
         lambda r: r["needs_deposit"] and not r["payment_received"],
         axis=1
     )
 
+
     # -----------------------------
     # TTLOCK STATUS
     # -----------------------------
-    done_refs = set(ttlog["reservation_code"].astype(str).unique()) if "reservation_code" in ttlog else set()
+    done_refs = set(ttlog["reservation_code"].astype(str)) if "reservation_code" in ttlog else set()
     valid["lock_set"] = valid["reservation_code"].isin(done_refs)
 
+
     # -----------------------------
-    # FINAL COLUMN ORDER
+    # OUTPUT COLUMNS
     # -----------------------------
     cols = [
         "reservation_code",
-        "room",
-        "location",
+        "property_location",
+        "door_number",
         "guest_name",
         "email_address",
         "check_in",
@@ -95,10 +121,11 @@ def main():
         "description",
     ]
 
-    final = valid[[c for c in cols if c in valid.columns]]
+    final = valid[[c for c in cols if c in valid.columns]].copy()
+
 
     # -----------------------------
-    # WRITE OUTPUT CSV
+    # WRITE OUTPUT
     # -----------------------------
     final.to_csv(OUTPUT, index=False)
     print(f"✅ reservation_status.csv written to {OUTPUT}")
