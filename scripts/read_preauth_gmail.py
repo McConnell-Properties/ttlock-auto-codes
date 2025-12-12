@@ -24,7 +24,6 @@ def read_and_append():
         print("❌ IMAP login failed:", e)
         return
 
-    # Select inbox
     status, _ = mail.select("inbox")
     print(f"IMAP select() status: {status}")
 
@@ -32,7 +31,6 @@ def read_and_append():
         print("❌ Could not open inbox.")
         return
 
-    # Get all emails
     status, data = mail.search(None, "ALL")
     print(f"IMAP search() status: {status}")
 
@@ -47,30 +45,27 @@ def read_and_append():
     scanned = 0
     matched = 0
 
-    for num in ids[-200:]:  
-        # limit to last 200 emails to speed things up
+    for num in ids[-200:]:
         scanned += 1
 
         try:
             status, msg_data = mail.fetch(num, "(RFC822)")
             if status != "OK":
-                print(f"⚠️ Failed to fetch email ID {num}")
                 continue
 
             msg = email.message_from_bytes(msg_data[0][1])
 
             subject = msg.get("Subject", "")
             date_received = msg.get("Date", "")
+
             print(f"\n--- EMAIL #{scanned} ---")
             print("Subject:", subject)
             print("Date:", date_received)
 
-            # Match different possible subject formats
             if "Pre-authorisation confirmed" not in subject:
                 print("❌ Not a pre-auth email. Skipping.")
                 continue
 
-            # Extract reservation code ###-###-###
             ref = ""
             words = subject.replace("–", "-").replace("—", "-").split()
             for part in words:
@@ -109,14 +104,18 @@ def read_and_append():
         print("⚠️ No pre-authorisation confirmations found.")
         return
 
-    # Load old CSV
     try:
         df_old = pd.read_csv(CSV_PATH)
     except:
         df_old = pd.DataFrame()
 
     df_new = pd.DataFrame(rows)
-    df_all = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates()
+
+    # ✅ FIX: dedupe by reservation_code only
+    df_all = (
+        pd.concat([df_old, df_new], ignore_index=True)
+        .drop_duplicates(subset=["reservation_code"], keep="first")
+    )
 
     df_all.to_csv(CSV_PATH, index=False)
     print(f"✔ Logged {matched} new payment confirmations.")
