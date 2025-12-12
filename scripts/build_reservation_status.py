@@ -88,7 +88,7 @@ def main():
     )
 
     # -----------------------------
-    # Parse dates
+    # Parse dates (from bookings.csv)
     # -----------------------------
     if "check_in" in bookings:
         bookings["check_in"] = bookings["check_in"].apply(parse_date)
@@ -125,11 +125,25 @@ def main():
     )
 
     # -----------------------------
+    # RENAME COLUMNS FOR OUTPUT
+    # Match bookings.csv headers for check-in/out
+    # -----------------------------
+    output = final.copy()
+    rename_output = {}
+    if "check_in" in output.columns:
+        rename_output["check_in"] = "DTSTART (Check-in)"
+    if "check_out" in output.columns:
+        rename_output["check_out"] = "DTEND (Check-out)"
+
+    if rename_output:
+        output.rename(columns=rename_output, inplace=True)
+
+    # -----------------------------
     # WRITE OUTPUT
     # -----------------------------
-    final.to_csv(OUTPUT, index=False)
+    output.to_csv(OUTPUT, index=False)
     print(f"✅ reservation_status.csv written to {OUTPUT}")
-    print(f"📊 {len(final)} combined reservations written.")
+    print(f"📊 {len(output)} combined reservations written.")
 
 
 if __name__ == "__main__":
