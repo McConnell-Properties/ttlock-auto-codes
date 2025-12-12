@@ -60,6 +60,7 @@ def load_completed_locks():
     Load a map of which locks have successfully been created for each reservation.
     Structure: { 'reservation_ref': {'front_door', 'room'} }
     Only includes entries where code_created == 'yes'.
+    This is used to determine which reservations to skip or partially skip.
     """
     completed = {}
 
@@ -68,141 +69,27 @@ def load_completed_locks():
         return completed
 
     # Read the existing log file
-    with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ref = (row.get("reservation_code") or row.get("Reservation Code") or "").strip()
-            status = row.get("code_created")
-            lock_type = row.get("lock_type")
+    try:
+        df = pd.read_csv(TTLOCK_LOG_PATH, dtype=str)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
+        df = df.dropna(subset=['timestamp', 'reservation_code', 'lock_type'])
+    except Exception as e:
+        print(f"⚠️ Error reading/parsing {TTLOCK_LOG_PATH}: {e}. Treating as first run.")
+        return completed
+    
+    # Filter for successful entries
+    success_df = df[df["code_created"] == "yes"]
+    
+    for _, row in success_df.iterrows():
+        ref = row["reservation_code"]
+        lock_type = row["lock_type"]
 
-            # Only track successful creations
-            if ref and status == "yes" and lock_type:
-                if ref not in completed:
-                    completed[ref] = set()
-                completed[ref].add(lock_type)
+        if ref not in completed:
+            completed[ref] = set()
+        completed[ref].add(lock_type)
 
     print(f"✔ Loaded completion status for {len(completed)} reservations.")
     return completed
-
-
-def append_log_entry(entry: dict):
-    """
-    Immediately append a single entry to the log file.
-    """
-    file_exists = os.path.isfile(TTLOCK_LOG_PATH)
-    
-    # Ensure directory exists (in case the path contains folders)
-    os.makedirs(os.path.dirname(TTLOCK_LOG_PATH), exist_ok=True)
-
-    # Use 'a' mode for append
-    with open(TTLOCK_LOG_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=LOG_FIELDNAMES)
-        # Write header only if the file is new
-        if not file_exists:
-            writer.writeheader()
-        writer.writerow(entry)
-
-
-def aggregate_bookings():
-    """
-    Load bookings.csv, apply date filters, merge duplicate rows per reservation_code,
-    and return a list of "booking" dicts ready for TTLock logic.
-    """
-    if not os.path.exists(BOOKINGS_PATH):
-        print(f"⚠️ {BOOKINGS_PATH} not found – aborting TTLock step.")
-        return []
-
-    df = pd.read_csv(BOOKINGS_PATH, dtype=str)
-    df.columns = [c.strip() for c in df.columns]
-
-    # ---- Extract reservation_code ----
-    def extract_ref(summary):
-        if not isinstance(summary, str):
-            return ""
-        m = re.search(r"(\d{3}-\d{3}-\d{3})", summary)
-        return m.group(1) if m else ""
-
-    df["reservation_code"] = df["SUMMARY"].apply(extract_ref)
-    df = df[df["reservation_code"] != ""].copy()
-
-    if df.empty:
-        print("ℹ️ No rows in bookings.csv with a reservation reference.")
-        return []
-
-    # ---- Parse dates & apply 30-day window ----
-    df["check_in"] = pd.to_datetime(
-        df["DTSTART (Check-in)"].apply(clean_date_str),
-        errors="coerce"
-    )
-    df["check_out"] = pd.to_datetime(
-        df["DTEND (Check-out)"].apply(clean_date_str),
-        errors="coerce"
-    )
-
-    df = df.dropna(subset=["check_in", "check_out"])
-
-    today = date.today()
-    horizon = today + timedelta(days=30)
-
-    # Rule: ignore check-out in past, and check-in > 30 days in future
-    mask = (df["check_out"].dt.date >= today) & (df["check_in"].dt.date <= horizon)
-    df = df[mask].copy()
-
-    if df.empty:
-        print("ℹ️ No bookings within the 30-day window.")
-        return []
-
-    # ---- Detect platform rows ----
-    def is_channel_row(desc, email):
-        text = (str(desc) + " " + str(email)).lower()
-        return ("@guest.booking.com" in text) or ("expediapartnercentral.com" in text)
-
-    df["is_channel_row"] = df.apply(
-        lambda r: is_channel_row(
-            r.get("DESCRIPTION", ""),
-            r.get("Email Address", "")
-        ),
-        axis=1
-    )
-
-    bookings = []
-
-    # ---- Merge duplicate rows ----
-    for ref, g in df.groupby("reservation_code"):
-        first = g.iloc[0]
-
-        location = first.get("Location", "") or ""
-        room = first.get("Room", "") or ""
-        guest = first.get("Guest Name", "") or ""
-        desc = first.get("DESCRIPTION", "") or ""
-
-        check_in = g["check_in"].min()
-        check_out = g["check_out"].max()
-
-        has_channel = g["is_channel_row"].any()
-
-        emails_raw = g["Email Address"].astype(str).tolist()
-        emails = [e for e in emails_raw if e and e.lower() != "nan"]
-        emails = list(dict.fromkeys(emails))
-
-        digits = re.sub(r"\D", "", ref)
-        code = digits[:4] if len(digits) >= 4 else None
-
-        bookings.append({
-            "reservation_code": ref,
-            "guest_name": guest,
-            "property_location": location,
-            "door_number": room,
-            "check_in": check_in,
-            "check_out": check_out,
-            "has_channel": has_channel,
-            "description": desc,
-            "emails": ";".join(emails),
-            "code": code,
-        })
-
-    print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
-    return bookings
 
 
 def main():
@@ -222,7 +109,9 @@ def main():
         print("ℹ️ No eligible bookings found – nothing to do.")
         return
 
-    total_new_log_entries = 0
+    # Collect all new log rows here, then clean the final log file at the end
+    log_rows = []
+    total_attempts = 0
 
     for booking in bookings:
         ref = booking["reservation_code"]
@@ -277,6 +166,7 @@ def main():
                 print(f"✅ Front door code already set for {ref} – skipping this lock.")
             else:
                 print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id})")
+                total_attempts += 1
                 success, resp = tt.create_lock_code_simple(
                     front_door_lock_id,
                     code,
@@ -288,11 +178,12 @@ def main():
                 )
 
                 # Special handling: If error is -3007 (Duplicate), treat as success so we don't retry forever
-                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
+                is_duplicate_error = (not success and isinstance(resp, dict) and resp.get("errcode") == -3007)
+                if is_duplicate_error:
                     print(f"   ℹ️ Lock returned 'Duplicate passcode' (Error -3007) – treating as SUCCESS.")
                     success = True
 
-                log_entry = {
+                log_rows.append({
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
                     "guest_name": guest_name,
@@ -301,13 +192,11 @@ def main():
                     "lock_type": "front_door",
                     "code_created": "yes" if success else "no",
                     "ttlock_response": str(resp),
-                }
-                append_log_entry(log_entry)
-                total_new_log_entries += 1
+                })
 
                 if success:
                     any_success_in_run = True
-                    # Update the map so later checks in this loop know the status
+                    # Update the map so the next check in this loop (room lock) knows the status
                     done_locks.add("front_door") 
                     print(f"✅ Front door code CREATED (or already existed) for {ref}")
                 else:
@@ -323,6 +212,7 @@ def main():
                 print(f"✅ Room code already set for {ref} – skipping this lock.")
             else:
                 print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id})")
+                total_attempts += 1
                 success, resp = tt.create_lock_code_simple(
                     room_lock_id,
                     code,
@@ -334,11 +224,12 @@ def main():
                 )
 
                 # Special handling: If error is -3007 (Duplicate), treat as success so we don't retry forever
-                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
+                is_duplicate_error = (not success and isinstance(resp, dict) and resp.get("errcode") == -3007)
+                if is_duplicate_error:
                     print(f"   ℹ️ Lock returned 'Duplicate passcode' (Error -3007) – treating as SUCCESS.")
                     success = True
 
-                log_entry = {
+                log_rows.append({
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
                     "guest_name": guest_name,
@@ -347,13 +238,11 @@ def main():
                     "lock_type": "room",
                     "code_created": "yes" if success else "no",
                     "ttlock_response": str(resp),
-                }
-                append_log_entry(log_entry)
-                total_new_log_entries += 1
+                })
 
                 if success:
                     any_success_in_run = True
-                    # Update the map so later checks in this loop know the status
+                    # Update the map so the final check knows the status
                     done_locks.add("room")
                     print(f"✅ Room code CREATED (or already existed) for {ref}")
                 else:
@@ -364,13 +253,63 @@ def main():
         if any_success_in_run:
             print(f"🎉 New codes created/logged for {ref}.")
         elif "front_door" in done_locks or "room" in done_locks:
-            # This handles cases where one lock was already done, but the other lock failed in this run.
             print(f"ℹ️ No NEW codes needed (some were already set).")
         else:
             print(f"❌ No successful TTLock codes created for {ref}.")
-            
-    print(f"\n=== TTLock Automation Complete ===")
-    print(f"📝 Total new log entries written to {TTLOCK_LOG_PATH}: {total_new_log_entries}")
+
+
+    # ---- Final Log Cleaning and Overwriting ----
+    
+    print("\n📝 Cleaning and writing log file...")
+    
+    existing_df = pd.DataFrame()
+    if os.path.exists(TTLOCK_LOG_PATH):
+        try:
+            # Read existing log, treating all fields as string initially
+            existing_df = pd.read_csv(TTLOCK_LOG_PATH, dtype=str)
+        except pd.errors.EmptyDataError:
+            print("ℹ️ Existing log file was empty. Starting fresh log.")
+        except Exception as e:
+            print(f"⚠️ Error reading existing log: {e}. Starting fresh log.")
+
+    # Convert the new log entries list into a DataFrame
+    new_df = pd.DataFrame(log_rows, columns=LOG_FIELDNAMES)
+
+    # Combine existing and new data. Need to concatenate, then convert timestamp for sorting.
+    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+    
+    # Ensure all columns are present and correctly ordered before conversion
+    combined_df = combined_df.reindex(columns=LOG_FIELDNAMES)
+    
+    # Convert timestamp column, coercing errors (e.g., if there were bad dates)
+    combined_df["timestamp"] = pd.to_datetime(combined_df["timestamp"], errors='coerce')
+    
+    # Drop rows where critical fields are missing
+    combined_df = combined_df.dropna(subset=['reservation_code', 'lock_type'])
+    
+    # Sort by timestamp (newest first) and drop duplicates, keeping the first (newest) entry
+    # This is the core deduplication logic requested by the user
+    cleaned_df = combined_df.sort_values(
+        by=['timestamp'], 
+        ascending=False
+    ).drop_duplicates(
+        subset=['reservation_code', 'lock_type'], 
+        keep='first'
+    ).sort_values(
+        by=['timestamp'], 
+        ascending=True # Re-sort by time ascending for chronological order in file
+    )
+
+    # Convert timestamp back to ISO format string for consistent CSV logging
+    cleaned_df['timestamp'] = cleaned_df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f').str[:-3]
+
+    # Write the final cleaned data, overwriting the old file
+    os.makedirs(os.path.dirname(TTLOCK_LOG_PATH), exist_ok=True)
+    cleaned_df.to_csv(TTLOCK_LOG_PATH, index=False, quoting=csv.QUOTE_MINIMAL)
+    
+    print(f"✔ Successfully cleaned and wrote {len(cleaned_df)} unique log entries to {TTLOCK_LOG_PATH}")
+    print(f"   {len(log_rows)} new entries were added/updated in this run.")
+    print("=== TTLock Automation Complete ===")
 
 
 if __name__ == "__main__":
