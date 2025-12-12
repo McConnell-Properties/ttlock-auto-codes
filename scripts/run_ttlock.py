@@ -11,6 +11,18 @@ BOOKINGS_PATH = "automation-data/bookings.csv"
 PAYMENTS_PATH = "automation-data/payments_log.csv"
 TTLOCK_LOG_PATH = "automation-data/ttlock_log.csv"
 
+# Define headers globally to ensure consistency
+LOG_FIELDNAMES = [
+    "timestamp",
+    "reservation_code",
+    "guest_name",
+    "property_location",
+    "door_number",
+    "lock_type",
+    "code_created",
+    "ttlock_response",
+]
+
 
 def clean_date_str(s: str) -> str:
     """
@@ -70,6 +82,22 @@ def load_completed_locks():
 
     print(f"✔ Loaded completion status for {len(completed)} reservations.")
     return completed
+
+
+def append_log_entry(entry: dict):
+    """
+    Immediately append a single entry to the log file.
+    """
+    file_exists = os.path.isfile(TTLOCK_LOG_PATH)
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(TTLOCK_LOG_PATH), exist_ok=True)
+
+    with open(TTLOCK_LOG_PATH, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDNAMES)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(entry)
 
 
 def aggregate_bookings():
@@ -191,8 +219,6 @@ def main():
         print("ℹ️ No eligible bookings found – nothing to do.")
         return
 
-    log_rows = []
-
     for booking in bookings:
         ref = booking["reservation_code"]
         guest_name = booking["guest_name"]
@@ -255,7 +281,7 @@ def main():
                     ref
                 )
 
-                log_rows.append({
+                log_entry = {
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
                     "guest_name": guest_name,
@@ -264,7 +290,8 @@ def main():
                     "lock_type": "front_door",
                     "code_created": "yes" if success else "no",
                     "ttlock_response": str(resp),
-                })
+                }
+                append_log_entry(log_entry)
 
                 if success:
                     any_success = True
@@ -292,7 +319,7 @@ def main():
                     ref
                 )
 
-                log_rows.append({
+                log_entry = {
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
                     "guest_name": guest_name,
@@ -301,7 +328,8 @@ def main():
                     "lock_type": "room",
                     "code_created": "yes" if success else "no",
                     "ttlock_response": str(resp),
-                })
+                }
+                append_log_entry(log_entry)
 
                 if success:
                     any_success = True
@@ -317,36 +345,6 @@ def main():
             print(f"ℹ️ No NEW codes needed (some were already set).")
         else:
             print(f"❌ No successful TTLock codes created for {ref}.")
-
-    # ---- Write / append ttlock_log.csv ----
-    if log_rows:
-        existing_rows = []
-
-        if os.path.exists(TTLOCK_LOG_PATH):
-            with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                existing_rows = list(reader)
-
-        fieldnames = [
-            "timestamp",
-            "reservation_code",
-            "guest_name",
-            "property_location",
-            "door_number",
-            "lock_type",
-            "code_created",
-            "ttlock_response",
-        ]
-
-        with open(TTLOCK_LOG_PATH, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in existing_rows + log_rows:
-                writer.writerow(row)
-
-        print(f"\n📝 Appended {len(log_rows)} new entries into {TTLOCK_LOG_PATH}")
-    else:
-        print("\nℹ️ No new TTLock log entries to write.")
 
 
 if __name__ == "__main__":
