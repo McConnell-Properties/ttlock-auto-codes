@@ -185,6 +185,32 @@ def aggregate_bookings():
     print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
     return bookings
 
+def locks_fully_created(ref):
+    """
+    Return True only if BOTH front_door and room locks
+    have at least one successful ('yes') entry.
+    """
+    if not os.path.exists(TTLOCK_LOG_PATH):
+        return False
+
+    front_ok = False
+    room_ok = False
+
+    with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("reservation_code") != ref:
+                continue
+            if row.get("code_created") != "yes":
+                continue
+
+            if row.get("lock_type") == "front_door":
+                front_ok = True
+            elif row.get("lock_type") == "room":
+                room_ok = True
+
+    return front_ok and room_ok
+
 
 def main():
     print("=== TTLock Automation Start ===")
@@ -223,8 +249,9 @@ def main():
 
         # Rule D: skip if this reservation was already processed in ttlock_log.csv
         if ref in already_coded_refs:
-            print(f"⏭️ Skipping {ref} – already present in ttlock_log.csv")
-            continue
+        print(f"⏭️ Skipping {ref} – already present in ttlock_log.csv")
+        continue
+
 
         # Rule A & B: deposit/pre-auth logic
         is_paid = ref in paid_refs
