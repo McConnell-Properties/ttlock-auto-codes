@@ -14,11 +14,7 @@ TTLOCK_LOG_PATH = "automation-data/ttlock_log.csv"
 
 def clean_date_str(s: str) -> str:
     """
-    Clean the JS-style date string coming from Google Sheets CSV, e.g.:
-
-      'Wed Dec 10 2025 00:00:00 GMT+0000 (Greenwich Mean Time)'
-
-    We strip the trailing ' GMT+0000 (Greenwich Mean Time)' so pandas can parse it.
+    Clean the JS-style date string coming from Google Sheets CSV.
     """
     if not isinstance(s, str):
         return s
@@ -27,10 +23,7 @@ def clean_date_str(s: str) -> str:
 
 def load_paid_refs():
     """
-    Load reservation codes that have a payment/pre-auth recorded in payments_log.csv.
-
-    payments_log.csv columns (from your Gmail step):
-        timestamp, reservation_code, received_at
+    Load reservation codes that have a payment/pre-auth recorded.
     """
     paid = set()
 
@@ -50,39 +43,39 @@ def load_paid_refs():
     return paid
 
 
-def load_existing_ttlock_refs():
+def load_completed_locks():
     """
-    Load reservation codes that have already had TTLock codes attempted/created.
-
-    This prevents trying to create codes again for the same reservation.
+    Load a map of which locks have successfully been created for each reservation.
+    Structure: { 'reservation_ref': {'front_door', 'room'} }
+    Only includes entries where code_created == 'yes'.
     """
-    existing = set()
+    completed = {}
 
     if not os.path.exists(TTLOCK_LOG_PATH):
         print("ℹ️ No ttlock_log.csv yet – treating this as first run.")
-        return existing
+        return completed
 
     with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             ref = (row.get("reservation_code") or row.get("Reservation Code") or "").strip()
-            if ref:
-                existing.add(ref)
+            status = row.get("code_created")
+            lock_type = row.get("lock_type")
 
-    print(f"✔ Loaded {len(existing)} reservation refs already present in ttlock_log.csv")
-    return existing
+            # Only track successful creations
+            if ref and status == "yes" and lock_type:
+                if ref not in completed:
+                    completed[ref] = set()
+                completed[ref].add(lock_type)
+
+    print(f"✔ Loaded completion status for {len(completed)} reservations.")
+    return completed
 
 
 def aggregate_bookings():
     """
     Load bookings.csv, apply date filters, merge duplicate rows per reservation_code,
     and return a list of "booking" dicts ready for TTLock logic.
-
-    bookings.csv columns (as you provided):
-        Room, PRODID, VERSION, UID, DTSTAMP,
-        DTSTART (Check-in), DTEND (Check-out),
-        SUMMARY, DESCRIPTION, SEQUENCE,
-        Location, Guest Name, Email Address, Phone Number
     """
     if not os.path.exists(BOOKINGS_PATH):
         print(f"⚠️ {BOOKINGS_PATH} not found – aborting TTLock step.")
@@ -91,7 +84,7 @@ def aggregate_bookings():
     df = pd.read_csv(BOOKINGS_PATH, dtype=str)
     df.columns = [c.strip() for c in df.columns]
 
-    # ---- Extract reservation_code from SUMMARY (e.g. 859-653-424) ----
+    # ---- Extract reservation_code ----
     def extract_ref(summary):
         if not isinstance(summary, str):
             return ""
@@ -105,7 +98,7 @@ def aggregate_bookings():
         print("ℹ️ No rows in bookings.csv with a reservation reference.")
         return []
 
-    # ---- Parse check-in/check-out dates & apply the 30-day window rules ----
+    # ---- Parse dates & apply 30-day window ----
     df["check_in"] = pd.to_datetime(
         df["DTSTART (Check-in)"].apply(clean_date_str),
         errors="coerce"
@@ -120,7 +113,7 @@ def aggregate_bookings():
     today = date.today()
     horizon = today + timedelta(days=30)
 
-    # Rule C: ignore check-out in past, and check-in > 30 days in future
+    # Rule: ignore check-out in past, and check-in > 30 days in future
     mask = (df["check_out"].dt.date >= today) & (df["check_in"].dt.date <= horizon)
     df = df[mask].copy()
 
@@ -128,7 +121,7 @@ def aggregate_bookings():
         print("ℹ️ No bookings within the 30-day window.")
         return []
 
-    # ---- Detect whether a row is a "platform" row (Booking.com / Expedia) ----
+    # ---- Detect platform rows ----
     def is_channel_row(desc, email):
         text = (str(desc) + " " + str(email)).lower()
         return ("@guest.booking.com" in text) or ("expediapartnercentral.com" in text)
@@ -143,7 +136,7 @@ def aggregate_bookings():
 
     bookings = []
 
-    # ---- Merge duplicate rows per reservation_code ----
+    # ---- Merge duplicate rows ----
     for ref, g in df.groupby("reservation_code"):
         first = g.iloc[0]
 
@@ -158,14 +151,9 @@ def aggregate_bookings():
         has_channel = g["is_channel_row"].any()
 
         emails_raw = g["Email Address"].astype(str).tolist()
-        emails = [
-            e for e in emails_raw
-            if e and e.lower() != "nan"
-        ]
-        # Keep unique order
+        emails = [e for e in emails_raw if e and e.lower() != "nan"]
         emails = list(dict.fromkeys(emails))
 
-        # Code: first 4 digits from reservation_code
         digits = re.sub(r"\D", "", ref)
         code = digits[:4] if len(digits) >= 4 else None
 
@@ -185,37 +173,10 @@ def aggregate_bookings():
     print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
     return bookings
 
-def locks_fully_created(ref):
-    """
-    Return True only if BOTH front_door and room locks
-    have at least one successful ('yes') entry.
-    """
-    if not os.path.exists(TTLOCK_LOG_PATH):
-        return False
-
-    front_ok = False
-    room_ok = False
-
-    with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row.get("reservation_code") != ref:
-                continue
-            if row.get("code_created") != "yes":
-                continue
-
-            if row.get("lock_type") == "front_door":
-                front_ok = True
-            elif row.get("lock_type") == "room":
-                room_ok = True
-
-    return front_ok and room_ok
-
 
 def main():
     print("=== TTLock Automation Start ===")
 
-    # Initialise TTLock with CLIENT_ID from environment
     client_id = os.getenv("TTLOCK_CLIENT_ID")
     if not client_id:
         print("❌ TTLOCK_CLIENT_ID not set in environment – cannot proceed.")
@@ -223,7 +184,7 @@ def main():
     tt.initialize_ttlock(client_id)
 
     paid_refs = load_paid_refs()
-    already_coded_refs = load_existing_ttlock_refs()
+    completed_map = load_completed_locks()
     bookings = aggregate_bookings()
 
     if not bookings:
@@ -244,37 +205,33 @@ def main():
 
         print(f"\n📋 Evaluating reservation {ref} for guest '{guest_name}'")
         print(f"   Property: {location}, Room: {room_name}")
-        print(f"   Check-in: {check_in}, Check-out: {check_out}")
-        print(f"   Platform booking? {'YES' if has_channel else 'NO'}")
 
-        # Rule D: skip if this reservation was already processed in ttlock_log.csv
-        if ref in already_coded_refs:
-        print(f"⏭️ Skipping {ref} – already present in ttlock_log.csv")
-        continue
-
+        # Rule D: Check specifically if BOTH locks are already successful
+        done_locks = completed_map.get(ref, set())
+        
+        if "front_door" in done_locks and "room" in done_locks:
+            print(f"⏭️ Skipping {ref} – BOTH front door and room codes already successful.")
+            continue
 
         # Rule A & B: deposit/pre-auth logic
         is_paid = ref in paid_refs
         if has_channel and not is_paid:
             print(f"⏭️ Skipping {ref} – platform booking with NO payment/pre-auth yet.")
             continue
+        elif has_channel:
+            print(f"✅ {ref} is platform booking WITH payment – allowed.")
         else:
-            if has_channel:
-                print(f"✅ {ref} is platform booking WITH payment – allowed.")
-            else:
-                print(f"✅ {ref} is non-platform booking – allowed without payment record.")
+            print(f"✅ {ref} is non-platform booking – allowed without payment record.")
 
         if not code:
-            print(f"⚠️ {ref}: could not derive a 4-digit code from reservation reference – skipping.")
+            print(f"⚠️ {ref}: could not derive a 4-digit code – skipping.")
             continue
 
-        # Map property + room to PROPERTIES config
         if location not in tt.PROPERTIES:
             print(f"⚠️ {ref}: unknown property_location '{location}' – skipping.")
             continue
 
         prop_conf = tt.PROPERTIES[location]
-
         start_ms = int(check_in.timestamp() * 1000)
         end_ms = int(check_out.timestamp() * 1000)
 
@@ -283,73 +240,81 @@ def main():
         # ---- 1. Front door code ----
         front_door_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
         if front_door_lock_id:
-            print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id})")
-            success, resp = tt.create_lock_code_simple(
-                front_door_lock_id,
-                code,
-                guest_name,
-                start_ms,
-                end_ms,
-                f"Front Door ({location})",
-                ref
-            )
-
-            log_rows.append({
-                "timestamp": datetime.utcnow().isoformat(),
-                "reservation_code": ref,
-                "guest_name": guest_name,
-                "property_location": location,
-                "door_number": "Front Door",
-                "lock_type": "front_door",
-                "code_created": "yes" if success else "no",
-                "ttlock_response": str(resp),
-            })
-
-            if success:
-                any_success = True
-                print(f"✅ Front door code CREATED for {ref}")
+            # Skip ONLY if this specific lock is already successful
+            if "front_door" in done_locks:
+                print(f"✅ Front door code already set for {ref} – skipping this lock.")
             else:
-                print(f"❌ Front door code FAILED for {ref}")
+                print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id})")
+                success, resp = tt.create_lock_code_simple(
+                    front_door_lock_id,
+                    code,
+                    guest_name,
+                    start_ms,
+                    end_ms,
+                    f"Front Door ({location})",
+                    ref
+                )
 
+                log_rows.append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "reservation_code": ref,
+                    "guest_name": guest_name,
+                    "property_location": location,
+                    "door_number": "Front Door",
+                    "lock_type": "front_door",
+                    "code_created": "yes" if success else "no",
+                    "ttlock_response": str(resp),
+                })
+
+                if success:
+                    any_success = True
+                    print(f"✅ Front door code CREATED for {ref}")
+                else:
+                    print(f"❌ Front door code FAILED for {ref}")
         else:
             print(f"ℹ️ No front door configured for property '{location}'")
 
         # ---- 2. Room door code ----
         room_lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
         if room_lock_id:
-            print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id})")
-            success, resp = tt.create_lock_code_simple(
-                room_lock_id,
-                code,
-                guest_name,
-                start_ms,
-                end_ms,
-                f"{room_name} ({location})",
-                ref
-            )
-
-            log_rows.append({
-                "timestamp": datetime.utcnow().isoformat(),
-                "reservation_code": ref,
-                "guest_name": guest_name,
-                "property_location": location,
-                "door_number": room_name,
-                "lock_type": "room",
-                "code_created": "yes" if success else "no",
-                "ttlock_response": str(resp),
-            })
-
-            if success:
-                any_success = True
-                print(f"✅ Room code CREATED for {ref}")
+            # Skip ONLY if this specific lock is already successful
+            if "room" in done_locks:
+                print(f"✅ Room code already set for {ref} – skipping this lock.")
             else:
-                print(f"❌ Room code FAILED for {ref}")
+                print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id})")
+                success, resp = tt.create_lock_code_simple(
+                    room_lock_id,
+                    code,
+                    guest_name,
+                    start_ms,
+                    end_ms,
+                    f"{room_name} ({location})",
+                    ref
+                )
+
+                log_rows.append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "reservation_code": ref,
+                    "guest_name": guest_name,
+                    "property_location": location,
+                    "door_number": room_name,
+                    "lock_type": "room",
+                    "code_created": "yes" if success else "no",
+                    "ttlock_response": str(resp),
+                })
+
+                if success:
+                    any_success = True
+                    print(f"✅ Room code CREATED for {ref}")
+                else:
+                    print(f"❌ Room code FAILED for {ref}")
         else:
             print(f"⚠️ No lock configured for room '{room_name}' at '{location}'")
-            print(f"   Known rooms: {list(prop_conf.get('ROOM_LOCK_IDS', {}).keys())}")
 
         if any_success:
-            print(f"🎉 Completed TTLock programming for {ref} – at least one lock succeeded.")
+            print(f"🎉 New codes created/logged for {ref}.")
+        elif "front_door" in done_locks or "room" in done_locks:
+            print(f"ℹ️ No NEW codes needed (some were already set).")
         else:
             print(f"❌ No successful TTLock codes created for {ref}.")
 
