@@ -207,7 +207,7 @@ def main():
 
     paid_refs = load_paid_refs()
     completed_map = load_completed_locks()
-    bookings = aggregate_bookings() # This call is now safe as function is defined above
+    bookings = aggregate_bookings()
 
     if not bookings:
         print("ℹ️ No eligible bookings found – nothing to do.")
@@ -256,8 +256,20 @@ def main():
             continue
 
         prop_conf = tt.PROPERTIES[location]
-        start_ms = int(check_in.timestamp() * 1000)
-        end_ms = int(check_out.timestamp() * 1000)
+
+        # -----------------------------------------------------------------
+        # NEW LOGIC: Adjust check-in/out times
+        # -----------------------------------------------------------------
+        # Check-in starts at 3:00 PM (15 hours offset) on the check_in date
+        start_dt = check_in + timedelta(hours=15)
+        start_ms = int(start_dt.timestamp() * 1000)
+
+        # Check-out ends at 11:00 AM (11 hours offset) on the check_out date
+        end_dt = check_out + timedelta(hours=11)
+        end_ms = int(end_dt.timestamp() * 1000)
+        
+        print(f"   Lock Time: {start_dt.strftime('%Y-%m-%d %H:%M')} to {end_dt.strftime('%Y-%m-%d %H:%M')}")
+        # -----------------------------------------------------------------
 
         any_success_in_run = False
 
