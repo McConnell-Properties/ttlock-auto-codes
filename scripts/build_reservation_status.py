@@ -47,14 +47,16 @@ def combine_rows(group):
     platform_emails = [e for e in platform_emails if e]
     row["platform_email"] = platform_emails[0] if platform_emails else None
 
-    # Check-in/out
-    cis = group["check_in"].dropna()
-    if len(cis) > 0:
-        row["check_in"] = cis.iloc[0]
+    # Check-in/out (defensive)
+    if "check_in" in group:
+        cis = group["check_in"].dropna()
+        if len(cis) > 0:
+            row["check_in"] = cis.iloc[0]
 
-    cos = group["check_out"].dropna()
-    if len(cos) > 0:
-        row["check_out"] = cos.iloc[0]
+    if "check_out" in group:
+        cos = group["check_out"].dropna()
+        if len(cos) > 0:
+            row["check_out"] = cos.iloc[0]
 
     return row
 
@@ -75,15 +77,15 @@ def main():
     # -----------------------------
     bookings.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
-    # IMPORTANT: after normalization, headers look like:
-    # "DTSTART (Check-in)"  -> "dtstart_(check_in)"
-    # "DTEND (Check-out)"   -> "dtend_(check_out)"
-    rename_map = {
-        "dtstart_(check_in)": "check_in",
-        "dtend_(check_out)": "check_out",
-        "email": "email_address",
-    }
-    bookings.rename(columns=rename_map, inplace=True)
+    # 🔧 FIX: rename ONLY if the normalized columns exist
+    if "dtstart_(check_in)" in bookings.columns:
+        bookings.rename(columns={"dtstart_(check_in)": "check_in"}, inplace=True)
+
+    if "dtend_(check_out)" in bookings.columns:
+        bookings.rename(columns={"dtend_(check_out)": "check_out"}, inplace=True)
+
+    if "email" in bookings.columns:
+        bookings.rename(columns={"email": "email_address"}, inplace=True)
 
     # -----------------------------
     # Extract reservation code
@@ -107,28 +109,27 @@ def main():
     )
 
     # -----------------------------
-    # Parse dates
+    # 🔧 FIX: Parse dates ONLY if columns exist
     # -----------------------------
-    bookings["check_in"] = bookings["check_in"].apply(parse_date)
-    bookings["check_out"] = bookings["check_out"].apply(parse_date)
+    if "check_in" in bookings.columns:
+        bookings["check_in"] = bookings["check_in"].apply(parse_date)
+
+    if "check_out" in bookings.columns:
+        bookings["check_out"] = bookings["check_out"].apply(parse_date)
 
     # -----------------------------
     # TTLock: derive front/room lock flags
     # -----------------------------
     print("🔐 Processing TTLock status…")
 
-    # Normalize ttlog headers too
     ttlog.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
     bookings["front_door_lock_set"] = False
     bookings["room_lock_set"] = False
 
     if not ttlog.empty:
-        # Front door lock
-        front = ttlog[(ttlog["lock_type"] == "front_door")]
-
-        # Room lock
-        room = ttlog[(ttlog["lock_type"] == "room")]
+        front = ttlog[ttlog["lock_type"] == "front_door"]
+        room = ttlog[ttlog["lock_type"] == "room"]
 
         bookings.loc[
             bookings["reservation_code"].isin(front["reservation_code"]),
@@ -150,15 +151,18 @@ def main():
         .reset_index(drop=True)
     )
 
-    # Keep TTLock flags after grouping
+    # Preserve TTLock flags
     final["front_door_lock_set"] = final["reservation_code"].isin(
-        bookings[bookings["front_door_lock_set"] == True]["reservation_code"]
-    )
-    final["room_lock_set"] = final["reservation_code"].isin(
-        bookings[bookings["room_lock_set"] == True]["reservation_code"]
+        bookings.loc[bookings["front_door_lock_set"], "reservation_code"]
     )
 
-    # Rename date fields to match original booking headers
+    final["room_lock_set"] = final["reservation_code"].isin(
+        bookings.loc[bookings["room_lock_set"], "reservation_code"]
+    )
+
+    # -----------------------------
+    # Rename dates back to original headers
+    # -----------------------------
     final.rename(columns={
         "check_in": "DTSTART (Check-in)",
         "check_out": "DTEND (Check-out)",
