@@ -67,6 +67,7 @@ def load_completed_locks():
         print("ℹ️ No ttlock_log.csv yet – treating this as first run.")
         return completed
 
+    # Read the existing log file
     with open(TTLOCK_LOG_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -90,11 +91,13 @@ def append_log_entry(entry: dict):
     """
     file_exists = os.path.isfile(TTLOCK_LOG_PATH)
     
-    # Ensure directory exists
+    # Ensure directory exists (in case the path contains folders)
     os.makedirs(os.path.dirname(TTLOCK_LOG_PATH), exist_ok=True)
 
+    # Use 'a' mode for append
     with open(TTLOCK_LOG_PATH, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=LOG_FIELDNAMES)
+        # Write header only if the file is new
         if not file_exists:
             writer.writeheader()
         writer.writerow(entry)
@@ -219,6 +222,8 @@ def main():
         print("ℹ️ No eligible bookings found – nothing to do.")
         return
 
+    total_new_log_entries = 0
+
     for booking in bookings:
         ref = booking["reservation_code"]
         guest_name = booking["guest_name"]
@@ -235,6 +240,7 @@ def main():
         # Rule D: Check specifically if BOTH locks are already successful
         done_locks = completed_map.get(ref, set())
         
+        # A reservation is skipped only when BOTH: a front door code has been successfully created, and a room door code has been successfully created
         if "front_door" in done_locks and "room" in done_locks:
             print(f"⏭️ Skipping {ref} – BOTH front door and room codes already successful.")
             continue
@@ -261,7 +267,7 @@ def main():
         start_ms = int(check_in.timestamp() * 1000)
         end_ms = int(check_out.timestamp() * 1000)
 
-        any_success = False
+        any_success_in_run = False
 
         # ---- 1. Front door code ----
         front_door_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
@@ -297,9 +303,12 @@ def main():
                     "ttlock_response": str(resp),
                 }
                 append_log_entry(log_entry)
+                total_new_log_entries += 1
 
                 if success:
-                    any_success = True
+                    any_success_in_run = True
+                    # Update the map so later checks in this loop know the status
+                    done_locks.add("front_door") 
                     print(f"✅ Front door code CREATED (or already existed) for {ref}")
                 else:
                     print(f"❌ Front door code FAILED for {ref}")
@@ -340,21 +349,28 @@ def main():
                     "ttlock_response": str(resp),
                 }
                 append_log_entry(log_entry)
+                total_new_log_entries += 1
 
                 if success:
-                    any_success = True
+                    any_success_in_run = True
+                    # Update the map so later checks in this loop know the status
+                    done_locks.add("room")
                     print(f"✅ Room code CREATED (or already existed) for {ref}")
                 else:
                     print(f"❌ Room code FAILED for {ref}")
         else:
             print(f"⚠️ No lock configured for room '{room_name}' at '{location}'")
 
-        if any_success:
+        if any_success_in_run:
             print(f"🎉 New codes created/logged for {ref}.")
         elif "front_door" in done_locks or "room" in done_locks:
+            # This handles cases where one lock was already done, but the other lock failed in this run.
             print(f"ℹ️ No NEW codes needed (some were already set).")
         else:
             print(f"❌ No successful TTLock codes created for {ref}.")
+            
+    print(f"\n=== TTLock Automation Complete ===")
+    print(f"📝 Total new log entries written to {TTLOCK_LOG_PATH}: {total_new_log_entries}")
 
 
 if __name__ == "__main__":
