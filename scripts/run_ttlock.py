@@ -70,11 +70,13 @@ def load_completed_locks():
 
     # Read the existing log file
     try:
+        # Read existing log, treating all fields as string initially
         df = pd.read_csv(TTLOCK_LOG_PATH, dtype=str)
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
         df = df.dropna(subset=['timestamp', 'reservation_code', 'lock_type'])
     except Exception as e:
-        print(f"⚠️ Error reading/parsing {TTLOCK_LOG_PATH}: {e}. Treating as first run.")
+        # If the file exists but can't be read (e.g., empty or bad format), assume no completed locks
+        print(f"⚠️ Error reading/parsing {TTLOCK_LOG_PATH}: {e}. Assuming no completed locks yet.")
         return completed
     
     # Filter for successful entries
@@ -92,6 +94,108 @@ def load_completed_locks():
     return completed
 
 
+def aggregate_bookings():
+    """
+    Load bookings.csv, apply date filters, merge duplicate rows per reservation_code,
+    and return a list of "booking" dicts ready for TTLock logic.
+    """
+    if not os.path.exists(BOOKINGS_PATH):
+        print(f"⚠️ {BOOKINGS_PATH} not found – aborting TTLock step.")
+        return []
+
+    df = pd.read_csv(BOOKINGS_PATH, dtype=str)
+    df.columns = [c.strip() for c in df.columns]
+
+    # ---- Extract reservation_code ----
+    def extract_ref(summary):
+        if not isinstance(summary, str):
+            return ""
+        m = re.search(r"(\d{3}-\d{3}-\d{3})", summary)
+        return m.group(1) if m else ""
+
+    df["reservation_code"] = df["SUMMARY"].apply(extract_ref)
+    df = df[df["reservation_code"] != ""].copy()
+
+    if df.empty:
+        print("ℹ️ No rows in bookings.csv with a reservation reference.")
+        return []
+
+    # ---- Parse dates & apply 30-day window ----
+    df["check_in"] = pd.to_datetime(
+        df["DTSTART (Check-in)"].apply(clean_date_str),
+        errors="coerce"
+    )
+    df["check_out"] = pd.to_datetime(
+        df["DTEND (Check-out)"].apply(clean_date_str),
+        errors="coerce"
+    )
+
+    df = df.dropna(subset=["check_in", "check_out"])
+
+    today = date.today()
+    horizon = today + timedelta(days=30)
+
+    # Rule: ignore check-out in past, and check-in > 30 days in future
+    mask = (df["check_out"].dt.date >= today) & (df["check_in"].dt.date <= horizon)
+    df = df[mask].copy()
+
+    if df.empty:
+        print("ℹ️ No bookings within the 30-day window.")
+        return []
+
+    # ---- Detect platform rows ----
+    def is_channel_row(desc, email):
+        text = (str(desc) + " " + str(email)).lower()
+        return ("@guest.booking.com" in text) or ("expediapartnercentral.com" in text)
+
+    df["is_channel_row"] = df.apply(
+        lambda r: is_channel_row(
+            r.get("DESCRIPTION", ""),
+            r.get("Email Address", "")
+        ),
+        axis=1
+    )
+
+    bookings = []
+
+    # ---- Merge duplicate rows ----
+    for ref, g in df.groupby("reservation_code"):
+        first = g.iloc[0]
+
+        location = first.get("Location", "") or ""
+        room = first.get("Room", "") or ""
+        guest = first.get("Guest Name", "") or ""
+        desc = first.get("DESCRIPTION", "") or ""
+
+        check_in = g["check_in"].min()
+        check_out = g["check_out"].max()
+
+        has_channel = g["is_channel_row"].any()
+
+        emails_raw = g["Email Address"].astype(str).tolist()
+        emails = [e for e in emails_raw if e and e.lower() != "nan"]
+        emails = list(dict.fromkeys(emails))
+
+        digits = re.sub(r"\D", "", ref)
+        code = digits[:4] if len(digits) >= 4 else None
+
+        bookings.append({
+            "reservation_code": ref,
+            "guest_name": guest,
+            "property_location": location,
+            "door_number": room,
+            "check_in": check_in,
+            "check_out": check_out,
+            "has_channel": has_channel,
+            "description": desc,
+            "emails": ";".join(emails),
+            "code": code,
+        })
+
+    print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
+    return bookings
+
+
 def main():
     print("=== TTLock Automation Start ===")
 
@@ -103,13 +207,12 @@ def main():
 
     paid_refs = load_paid_refs()
     completed_map = load_completed_locks()
-    bookings = aggregate_bookings()
+    bookings = aggregate_bookings() # This call is now safe as function is defined above
 
     if not bookings:
         print("ℹ️ No eligible bookings found – nothing to do.")
         return
 
-    # Collect all new log rows here, then clean the final log file at the end
     log_rows = []
     total_attempts = 0
 
@@ -288,7 +391,6 @@ def main():
     combined_df = combined_df.dropna(subset=['reservation_code', 'lock_type'])
     
     # Sort by timestamp (newest first) and drop duplicates, keeping the first (newest) entry
-    # This is the core deduplication logic requested by the user
     cleaned_df = combined_df.sort_values(
         by=['timestamp'], 
         ascending=False
