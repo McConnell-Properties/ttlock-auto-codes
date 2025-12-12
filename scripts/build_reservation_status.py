@@ -11,9 +11,6 @@ TTLOG   = "automation-data/ttlock_log.csv"
 OUTPUT  = "automation-data/reservation_status.csv"
 
 
-# -----------------------------
-# Parse date safely
-# -----------------------------
 def parse_date(x):
     try:
         return pd.to_datetime(x, utc=True)
@@ -21,9 +18,6 @@ def parse_date(x):
         return pd.NaT
 
 
-# -----------------------------
-# Extract platform email
-# -----------------------------
 def extract_platform_email(desc):
     if not isinstance(desc, str):
         return None
@@ -31,24 +25,17 @@ def extract_platform_email(desc):
     return match.group(0) if match else None
 
 
-
-# -----------------------------
-# Combine multiple bookings rows
-# -----------------------------
 def combine_rows(group):
     row = group.iloc[0].copy()
 
-    # Email
     emails = group["email_address"].dropna().unique()
     row["email_address"] = emails[0] if len(emails) > 0 else None
 
-    # Platform email
     descs = group["description"].dropna().astype(str).tolist()
     platform_emails = [extract_platform_email(d) for d in descs]
     platform_emails = [e for e in platform_emails if e]
     row["platform_email"] = platform_emails[0] if platform_emails else None
 
-    # Check-in/out
     cis = group["check_in"].dropna()
     if len(cis) > 0:
         row["check_in"] = cis.iloc[0]
@@ -58,7 +45,6 @@ def combine_rows(group):
         row["check_out"] = cos.iloc[0]
 
     return row
-
 
 
 def main():
@@ -78,9 +64,10 @@ def main():
     # -----------------------------
     bookings.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
+    # FIXED: correct normalized column names
     rename_map = {
-        "dtstart_(check-in)": "check_in",
-        "dtend_(check-out)": "check_out",
+        "dtstart_(check_in)": "check_in",
+        "dtend_(check_out)": "check_out",
         "email": "email_address",
     }
     bookings.rename(columns=rename_map, inplace=True)
@@ -94,18 +81,16 @@ def main():
 
 
     # -----------------------------
-    # Deposit & Payment Status
+    # Deposit / Payment status
     # -----------------------------
     bookings["needs_deposit"] = bookings["description"].astype(str).str.contains(
-        "booking.com|expedia", case=False, na=False
-    )
+        "booking.com|expedia", case=False, na=False)
 
     paid_refs = set(payments["ref"].astype(str)) if "ref" in payments else set()
     bookings["payment_received"] = bookings["reservation_code"].isin(paid_refs)
 
     bookings["outstanding_payment"] = bookings.apply(
-        lambda r: r["needs_deposit"] and not r["payment_received"],
-        axis=1
+        lambda r: r["needs_deposit"] and not r["payment_received"], axis=1
     )
 
 
@@ -117,45 +102,34 @@ def main():
 
 
     # -----------------------------
-    # TTLock: derive front/room lock flags
+    # TTLock flags
     # -----------------------------
-    print("🔐 Processing TTLock status…")
-
-    # Normalize ttlog headers too
     ttlog.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
     bookings["front_door_lock_set"] = False
     bookings["room_lock_set"] = False
 
     if not ttlog.empty:
-        # Front door lock
-        front = ttlog[(ttlog["lock_type"] == "front_door")]
-
-        # Room lock
-        room = ttlog[(ttlog["lock_type"] == "room")]
-
         bookings.loc[
-            bookings["reservation_code"].isin(front["reservation_code"]),
+            bookings["reservation_code"].isin(ttlog[ttlog["lock_type"] == "front_door"]["reservation_code"]),
             "front_door_lock_set"
         ] = True
 
         bookings.loc[
-            bookings["reservation_code"].isin(room["reservation_code"]),
+            bookings["reservation_code"].isin(ttlog[ttlog["lock_type"] == "room"]["reservation_code"]),
             "room_lock_set"
         ] = True
 
 
     # -----------------------------
-    # Combine per reservation
+    # Combine rows
     # -----------------------------
-    print("🔄 Deduplicating reservations…")
     final = (
         bookings.groupby("reservation_code", dropna=True)
         .apply(combine_rows)
         .reset_index(drop=True)
     )
 
-    # Keep TTLock flags after grouping
     final["front_door_lock_set"] = final["reservation_code"].isin(
         bookings[bookings["front_door_lock_set"] == True]["reservation_code"]
     )
@@ -163,21 +137,22 @@ def main():
         bookings[bookings["room_lock_set"] == True]["reservation_code"]
     )
 
-    # Rename date fields to match original booking headers
+    # -----------------------------
+    # Rename dates back
+    # -----------------------------
     final.rename(columns={
         "check_in": "DTSTART (Check-in)",
-        "check_out": "DTEND (Check-out)",
+        "check_out": "DTEND (Check-out)"
     }, inplace=True)
 
 
     # -----------------------------
-    # Write output
+    # Output
     # -----------------------------
     final.to_csv(OUTPUT, index=False)
 
     print(f"✅ reservation_status.csv written to {OUTPUT}")
     print(f"📊 {len(final)} combined reservations written.")
-
 
 
 if __name__ == "__main__":
