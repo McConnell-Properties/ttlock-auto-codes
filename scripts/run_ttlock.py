@@ -281,6 +281,11 @@ def main():
                     ref
                 )
 
+                # Special handling: If error is -3007 (Duplicate), treat as success so we don't retry forever
+                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
+                    print(f"   ℹ️ Lock returned 'Duplicate passcode' (Error -3007) – treating as SUCCESS.")
+                    success = True
+
                 log_entry = {
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
@@ -295,7 +300,7 @@ def main():
 
                 if success:
                     any_success = True
-                    print(f"✅ Front door code CREATED for {ref}")
+                    print(f"✅ Front door code CREATED (or already existed) for {ref}")
                 else:
                     print(f"❌ Front door code FAILED for {ref}")
         else:
@@ -319,6 +324,11 @@ def main():
                     ref
                 )
 
+                # Special handling: If error is -3007 (Duplicate), treat as success so we don't retry forever
+                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
+                    print(f"   ℹ️ Lock returned 'Duplicate passcode' (Error -3007) – treating as SUCCESS.")
+                    success = True
+
                 log_entry = {
                     "timestamp": datetime.utcnow().isoformat(),
                     "reservation_code": ref,
@@ -333,7 +343,7 @@ def main():
 
                 if success:
                     any_success = True
-                    print(f"✅ Room code CREATED for {ref}")
+                    print(f"✅ Room code CREATED (or already existed) for {ref}")
                 else:
                     print(f"❌ Room code FAILED for {ref}")
         else:
