@@ -64,3 +64,5 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2025-12-11T21:03:43.545240,519-349-514,Benjamin Matthews,Streatham,Room 6,room,yes,{'keyboardPwdId': 39956824}
 2025-12-11T21:03:46.071373,640-934-562,George Dumitrescu,Norwich,Front Door,front_door,no,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}"
 2025-12-12T06:43:46.805120,145-208-564,Oscar Moseley,Norwich,Front Door,front_door,yes,{'keyboardPwdId': 40033436}
+2025-12-12T08:57:02.873948,405-265-991,Khagendra Rai,Tooting,Front Door,front_door,yes,{'keyboardPwdId': 40055926}
+2025-12-12T08:57:04.795254,405-265-991,Khagendra Rai,Tooting,Room 4,room,yes,{'keyboardPwdId': 40055930}
