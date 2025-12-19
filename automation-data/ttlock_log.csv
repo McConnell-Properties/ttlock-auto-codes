@@ -85,3 +85,5 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2025-12-19T20:44:26.467,063-826-092,Syed Ahad Hussain,Tooting,Front Door,front_door,yes,{'keyboardPwdId': 41627532}
 2025-12-19T20:44:29.252,063-826-092,Syed Ahad Hussain,Tooting,Room 1,room,yes,{'keyboardPwdId': 41627546}
 2025-12-19T20:44:31.324,849-009-692,Divine Thomson,Streatham,Room 9,room,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}"
+2025-12-19T20:55:02.257,422-549-032,Arek Kotecki,Streatham,Front Door,front_door,yes,{'keyboardPwdId': 41629030}
+2025-12-19T20:55:04.246,422-549-032,Arek Kotecki,Streatham,Room 2,room,yes,{'keyboardPwdId': 41629036}
