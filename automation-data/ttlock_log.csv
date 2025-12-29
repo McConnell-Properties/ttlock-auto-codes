@@ -101,8 +101,12 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2025-12-29T11:13:19.032,252-630-432,Erin Peacock Conway,Streatham,Room 9,room,yes,{'keyboardPwdId': 43602030}
 2025-12-29T11:13:29.946,856-892-102,Ching Kai Lan,Tooting,Front Door,front_door,yes,{'keyboardPwdId': 43602066}
 2025-12-29T11:13:33.058,856-892-102,Ching Kai Lan,Tooting,Room 1,room,yes,{'keyboardPwdId': 43602074}
-2025-12-29T12:47:04.303,235-444-982,Victoria Hain,Norwich,Front Door,front_door,no,Failed after 3 retries
-2025-12-29T12:47:07.172,425-944-894,Jake Kay,Norwich,Front Door,front_door,no,Failed after 3 retries
-2025-12-29T12:47:09.743,481-333-834,Josh Keegan,Norwich,Front Door,front_door,no,Failed after 3 retries
-2025-12-29T12:47:12.463,696-461-354,wayne wicks,Norwich,Front Door,front_door,no,Failed after 3 retries
-2025-12-29T12:47:14.947,839-108-234,ashley amies,Norwich,Front Door,front_door,no,Failed after 3 retries
+2025-12-29T13:28:52.874,113-230-252,corentin Aubry,Streatham,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}"
+2025-12-29T13:28:54.007,113-230-252,corentin Aubry,Streatham,Room 10,room,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}"
+2025-12-29T13:28:55.750,221-129-291,Blaise Onyeneme,Streatham,Front Door,front_door,yes,{'keyboardPwdId': 43627916}
+2025-12-29T13:28:58.082,221-129-291,Blaise Onyeneme,Streatham,Room 5,room,yes,{'keyboardPwdId': 43627922}
+2025-12-29T13:29:00.307,235-444-982,Victoria Hain,Norwich,Front Door,front_door,no,Failed after 3 retries
+2025-12-29T13:29:02.615,425-944-894,Jake Kay,Norwich,Front Door,front_door,no,Failed after 3 retries
+2025-12-29T13:29:04.767,481-333-834,Josh Keegan,Norwich,Front Door,front_door,no,Failed after 3 retries
+2025-12-29T13:29:06.816,696-461-354,wayne wicks,Norwich,Front Door,front_door,no,Failed after 3 retries
+2025-12-29T13:29:08.920,839-108-234,ashley amies,Norwich,Front Door,front_door,no,Failed after 3 retries
