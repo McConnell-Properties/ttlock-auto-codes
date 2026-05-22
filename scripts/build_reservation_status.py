@@ -1,15 +1,10 @@
-# scripts/build_reservation_status.py
-
 import pandas as pd
 from datetime import datetime
 import os
-import re
 
-BOOKINGS = "automation-data/bookings.csv"
-PAYMENTS = "automation-data/payments_log.csv"
-TTLOG   = "automation-data/ttlock_log.csv"
-OUTPUT  = "automation-data/reservation_status.csv"
-
+RESERVATIONS = "automation-data/reservations.csv"
+TTLOG    = "automation-data/ttlock_log.csv"
+OUTPUT   = "automation-data/reservation_status.csv"
 
 # -----------------------------
 # Parse date safely
@@ -20,102 +15,65 @@ def parse_date(x):
     except:
         return pd.NaT
 
-
 # -----------------------------
-# Extract platform email
-# -----------------------------
-def extract_platform_email(desc):
-    if not isinstance(desc, str):
-        return None
-    match = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", desc)
-    return match.group(0) if match else None
-
-
-# -----------------------------
-# Combine multiple bookings rows
+# Combine multiple rows
 # -----------------------------
 def combine_rows(group):
     row = group.iloc[0].copy()
 
-    # Email
-    emails = group["email_address"].dropna().unique()
-    row["email_address"] = emails[0] if len(emails) > 0 else None
-
-    # Platform email
-    descs = group["description"].dropna().astype(str).tolist()
-    platform_emails = [extract_platform_email(d) for d in descs]
-    platform_emails = [e for e in platform_emails if e]
-    row["platform_email"] = platform_emails[0] if platform_emails else None
-
     # Check-in/out (defensive)
-    if "check_in" in group:
-        cis = group["check_in"].dropna()
+    if "check_in_date" in group:
+        cis = group["check_in_date"].dropna()
         if len(cis) > 0:
-            row["check_in"] = cis.iloc[0]
+            row["check_in_date"] = cis.iloc[0]
 
-    if "check_out" in group:
-        cos = group["check_out"].dropna()
+    if "check_out_date" in group:
+        cos = group["check_out_date"].dropna()
         if len(cos) > 0:
-            row["check_out"] = cos.iloc[0]
+            row["check_out_date"] = cos.iloc[0]
 
     return row
 
 
 def main():
 
-    print("📄 Loading bookings.csv…")
-    bookings = pd.read_csv(BOOKINGS)
-
-    print("📄 Loading payments_log.csv…")
-    payments = pd.read_csv(PAYMENTS) if os.path.exists(PAYMENTS) else pd.DataFrame(columns=["ref"])
+    print("📄 Loading reservations.csv…")
+    if not os.path.exists(RESERVATIONS):
+        print(f"❌ Could not find {RESERVATIONS}. Exiting.")
+        return
+        
+    reservations = pd.read_csv(RESERVATIONS, dtype=str)
 
     print("📄 Loading ttlock_log.csv…")
-    ttlog = pd.read_csv(TTLOG) if os.path.exists(TTLOG) else pd.DataFrame(columns=["reservation_code"])
+    ttlog = pd.read_csv(TTLOG, dtype=str) if os.path.exists(TTLOG) else pd.DataFrame(columns=["reservation_code", "lock_type"])
 
     # -----------------------------
-    # Normalize booking headers
+    # Normalize headers
     # -----------------------------
-    bookings.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
-
-    # 🔧 FIX: rename ONLY if the normalized columns exist
-    if "dtstart_(check_in)" in bookings.columns:
-        bookings.rename(columns={"dtstart_(check_in)": "check_in"}, inplace=True)
-
-    if "dtend_(check_out)" in bookings.columns:
-        bookings.rename(columns={"dtend_(check_out)": "check_out"}, inplace=True)
-
-    if "email" in bookings.columns:
-        bookings.rename(columns={"email": "email_address"}, inplace=True)
-
+    # Converts columns to lowercase with underscores (e.g., "Check in date" -> "check_in_date")
+    reservations.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
+    
     # -----------------------------
     # Extract reservation code
     # -----------------------------
-    print("🔍 Extracting reservation_code…")
-    bookings["reservation_code"] = bookings["summary"].astype(str).str.extract(r"(\d{3}-\d{3}-\d{3})")
+    if "booking_reference" in reservations.columns:
+        print("🔍 Extracting reservation_code…")
+        reservations["reservation_code"] = reservations["booking_reference"].fillna("").astype(str).str.strip()
+    else:
+        print("⚠️ 'Booking reference' column missing. Cannot proceed.")
+        return
+
+    # Filter out empty references
+    reservations = reservations[reservations["reservation_code"] != ""]
 
     # -----------------------------
-    # Deposit & Payment Status
+    # Parse dates
     # -----------------------------
-    bookings["needs_deposit"] = bookings["description"].astype(str).str.contains(
-        "booking.com|expedia", case=False, na=False
-    )
+    if "check_in_date" in reservations.columns:
+        reservations["check_in_date"] = reservations["check_in_date"].apply(parse_date)
 
-    paid_refs = set(payments["ref"].astype(str)) if "ref" in payments else set()
-    bookings["payment_received"] = bookings["reservation_code"].isin(paid_refs)
-
-    bookings["outstanding_payment"] = bookings.apply(
-        lambda r: r["needs_deposit"] and not r["payment_received"],
-        axis=1
-    )
-
-    # -----------------------------
-    # 🔧 FIX: Parse dates ONLY if columns exist
-    # -----------------------------
-    if "check_in" in bookings.columns:
-        bookings["check_in"] = bookings["check_in"].apply(parse_date)
-
-    if "check_out" in bookings.columns:
-        bookings["check_out"] = bookings["check_out"].apply(parse_date)
+    if "check_out_date" in reservations.columns:
+        reservations["check_out_date"] = reservations["check_out_date"].apply(parse_date)
 
     # -----------------------------
     # TTLock: derive front/room lock flags
@@ -124,20 +82,26 @@ def main():
 
     ttlog.rename(columns=lambda c: c.strip().lower().replace(" ", "_"), inplace=True)
 
-    bookings["front_door_lock_set"] = False
-    bookings["room_lock_set"] = False
+    reservations["front_door_lock_set"] = False
+    reservations["room_lock_set"] = False
 
-    if not ttlog.empty:
-        front = ttlog[ttlog["lock_type"] == "front_door"]
-        room = ttlog[ttlog["lock_type"] == "room"]
+    if not ttlog.empty and "lock_type" in ttlog.columns and "reservation_code" in ttlog.columns:
+        # Only flag as set if the code creation was actually successful
+        if "code_created" in ttlog.columns:
+            success_ttlog = ttlog[ttlog["code_created"].astype(str).str.lower() == "yes"]
+        else:
+            success_ttlog = ttlog
+            
+        front = success_ttlog[success_ttlog["lock_type"] == "front_door"]
+        room = success_ttlog[success_ttlog["lock_type"] == "room"]
 
-        bookings.loc[
-            bookings["reservation_code"].isin(front["reservation_code"]),
+        reservations.loc[
+            reservations["reservation_code"].isin(front["reservation_code"]),
             "front_door_lock_set"
         ] = True
 
-        bookings.loc[
-            bookings["reservation_code"].isin(room["reservation_code"]),
+        reservations.loc[
+            reservations["reservation_code"].isin(room["reservation_code"]),
             "room_lock_set"
         ] = True
 
@@ -146,26 +110,27 @@ def main():
     # -----------------------------
     print("🔄 Deduplicating reservations…")
     final = (
-        bookings.groupby("reservation_code", dropna=True)
+        reservations.groupby("reservation_code", dropna=True)
         .apply(combine_rows)
         .reset_index(drop=True)
     )
 
-    # Preserve TTLock flags
+    # Preserve TTLock flags after grouping
     final["front_door_lock_set"] = final["reservation_code"].isin(
-        bookings.loc[bookings["front_door_lock_set"], "reservation_code"]
+        reservations.loc[reservations["front_door_lock_set"], "reservation_code"]
     )
 
     final["room_lock_set"] = final["reservation_code"].isin(
-        bookings.loc[bookings["room_lock_set"], "reservation_code"]
+        reservations.loc[reservations["room_lock_set"], "reservation_code"]
     )
 
     # -----------------------------
-    # Rename dates back to original headers
+    # Rename dates back to original presentation headers
     # -----------------------------
     final.rename(columns={
-        "check_in": "DTSTART (Check-in)",
-        "check_out": "DTEND (Check-out)",
+        "check_in_date": "Check in date",
+        "check_out_date": "Check out date",
+        "booking_reference": "Booking reference"
     }, inplace=True)
 
     # -----------------------------
