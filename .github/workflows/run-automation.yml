@@ -69,7 +69,7 @@ jobs:
       # ===========================================================
       - name: Stage CSV changes
         run: |
-          git add automation-data/*.csv || true
+          git add automation-data/ || true
 
       - name: Check if anything changed
         id: changes
