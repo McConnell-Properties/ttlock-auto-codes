@@ -1,13 +1,14 @@
 import os
 import csv
 import re
+import glob
 from datetime import datetime, date, timedelta
 
 import pandas as pd
 
 import multi_property_lock_codes as tt
 
-BOOKINGS_PATH = "automation-data/reservations.csv"
+DATA_DIR = "automation-data"
 TTLOCK_LOG_PATH = "automation-data/ttlock_log.csv"
 
 # Define headers globally to ensure consistency
@@ -64,25 +65,39 @@ def load_completed_locks():
 
 def aggregate_bookings():
     """
-    Load reservations.csv, apply date filters, merge duplicate rows per reservation_code,
+    Load all CSVs in subfolders, apply date filters, merge duplicate rows per reservation_code,
     and return a list of "booking" dicts ready for TTLock logic.
     """
-    if not os.path.exists(BOOKINGS_PATH):
-        print(f"⚠️ {BOOKINGS_PATH} not found – aborting TTLock step.")
+    # Find all CSV files in automation-data and its subfolders
+    all_csvs = [f for f in glob.glob(f"{DATA_DIR}/**/*.csv", recursive=True) 
+                if not f.endswith("ttlock_log.csv") and not f.endswith("reservation_status.csv")]
+
+    if not all_csvs:
+        print(f"⚠️ No reservation CSVs found in {DATA_DIR}/ subfolders – aborting TTLock step.")
         return []
 
-    df = pd.read_csv(BOOKINGS_PATH, dtype=str)
+    df_list = []
+    for file in all_csvs:
+        try:
+            df_list.append(pd.read_csv(file, dtype=str))
+        except Exception as e:
+            print(f"⚠️ Could not read {file}: {e}")
+
+    if not df_list:
+        return []
+
+    df = pd.concat(df_list, ignore_index=True)
     df.columns = [c.strip() for c in df.columns]
 
     if "Booking reference" not in df.columns:
-        print(f"⚠️ 'Booking reference' column not found in {BOOKINGS_PATH}. Cannot process data.")
+        print("⚠️ 'Booking reference' column not found in uploaded CSVs. Cannot process data.")
         return []
 
     df["reservation_code"] = df["Booking reference"].fillna("").astype(str).str.strip()
     df = df[df["reservation_code"] != ""].copy()
 
     if df.empty:
-        print("ℹ️ No rows in reservations.csv with a reservation reference.")
+        print("ℹ️ No rows with a reservation reference found.")
         return []
 
     # ---- Parse dates & apply 30-day window ----
@@ -135,7 +150,7 @@ def aggregate_bookings():
             "code": code,
         })
 
-    print(f"✔ Aggregated to {len(bookings)} unique reservations (after merge & date filters).")
+    print(f"✔ Aggregated to {len(bookings)} unique reservations (from {len(all_csvs)} files).")
     return bookings
 
 
