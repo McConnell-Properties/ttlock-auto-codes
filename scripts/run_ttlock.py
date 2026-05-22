@@ -7,8 +7,7 @@ import pandas as pd
 
 import multi_property_lock_codes as tt
 
-BOOKINGS_PATH = "automation-data/bookings.csv"
-PAYMENTS_PATH = "automation-data/payments_log.csv"
+BOOKINGS_PATH = "automation-data/reservations.csv"
 TTLOCK_LOG_PATH = "automation-data/ttlock_log.csv"
 
 # Define headers globally to ensure consistency
@@ -22,37 +21,6 @@ LOG_FIELDNAMES = [
     "code_created",
     "ttlock_response",
 ]
-
-
-def clean_date_str(s: str) -> str:
-    """
-    Clean the JS-style date string coming from Google Sheets CSV.
-    """
-    if not isinstance(s, str):
-        return s
-    return s.replace(" GMT+0000 (Greenwich Mean Time)", "")
-
-
-def load_paid_refs():
-    """
-    Load reservation codes that have a payment/pre-auth recorded.
-    """
-    paid = set()
-
-    if not os.path.exists(PAYMENTS_PATH):
-        print("ℹ️ payments_log.csv not found – treating all NON-platform bookings as allowed, "
-              "and platform bookings as unpaid.")
-        return paid
-
-    with open(PAYMENTS_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ref = (row.get("reservation_code") or row.get("Reservation Code") or "").strip()
-            if ref:
-                paid.add(ref)
-
-    print(f"✔ Loaded {len(paid)} paid/pre-auth reservation refs from {PAYMENTS_PATH}")
-    return paid
 
 
 def load_completed_locks():
@@ -96,7 +64,7 @@ def load_completed_locks():
 
 def aggregate_bookings():
     """
-    Load bookings.csv, apply date filters, merge duplicate rows per reservation_code,
+    Load reservations.csv, apply date filters, merge duplicate rows per reservation_code,
     and return a list of "booking" dicts ready for TTLock logic.
     """
     if not os.path.exists(BOOKINGS_PATH):
@@ -106,29 +74,20 @@ def aggregate_bookings():
     df = pd.read_csv(BOOKINGS_PATH, dtype=str)
     df.columns = [c.strip() for c in df.columns]
 
-    # ---- Extract reservation_code ----
-    def extract_ref(summary):
-        if not isinstance(summary, str):
-            return ""
-        m = re.search(r"(\d{3}-\d{3}-\d{3})", summary)
-        return m.group(1) if m else ""
+    if "Booking reference" not in df.columns:
+        print(f"⚠️ 'Booking reference' column not found in {BOOKINGS_PATH}. Cannot process data.")
+        return []
 
-    df["reservation_code"] = df["SUMMARY"].apply(extract_ref)
+    df["reservation_code"] = df["Booking reference"].fillna("").astype(str).str.strip()
     df = df[df["reservation_code"] != ""].copy()
 
     if df.empty:
-        print("ℹ️ No rows in bookings.csv with a reservation reference.")
+        print("ℹ️ No rows in reservations.csv with a reservation reference.")
         return []
 
     # ---- Parse dates & apply 30-day window ----
-    df["check_in"] = pd.to_datetime(
-        df["DTSTART (Check-in)"].apply(clean_date_str),
-        errors="coerce"
-    )
-    df["check_out"] = pd.to_datetime(
-        df["DTEND (Check-out)"].apply(clean_date_str),
-        errors="coerce"
-    )
+    df["check_in"] = pd.to_datetime(df["Check in date"], errors="coerce")
+    df["check_out"] = pd.to_datetime(df["Check out date"], errors="coerce")
 
     df = df.dropna(subset=["check_in", "check_out"])
 
@@ -143,41 +102,28 @@ def aggregate_bookings():
         print("ℹ️ No bookings within the 30-day window.")
         return []
 
-    # ---- Detect platform rows ----
-    def is_channel_row(desc, email):
-        text = (str(desc) + " " + str(email)).lower()
-        return ("@guest.booking.com" in text) or ("expediapartnercentral.com" in text)
-
-    df["is_channel_row"] = df.apply(
-        lambda r: is_channel_row(
-            r.get("DESCRIPTION", ""),
-            r.get("Email Address", "")
-        ),
-        axis=1
-    )
-
     bookings = []
 
     # ---- Merge duplicate rows ----
     for ref, g in df.groupby("reservation_code"):
         first = g.iloc[0]
 
-        location = first.get("Location", "") or ""
-        room = first.get("Room", "") or ""
-        guest = first.get("Guest Name", "") or ""
-        desc = first.get("DESCRIPTION", "") or ""
+        location = first.get("Property name", "") or ""
+        room = first.get("Rooms", "") or ""
+        
+        # Combine first and last name
+        fname = str(first.get("Guest first name", "")).strip()
+        if fname.lower() == "nan": fname = ""
+        lname = str(first.get("Guest last name", "")).strip()
+        if lname.lower() == "nan": lname = ""
+        guest = f"{fname} {lname}".strip()
 
         check_in = g["check_in"].min()
         check_out = g["check_out"].max()
 
-        has_channel = g["is_channel_row"].any()
-
-        emails_raw = g["Email Address"].astype(str).tolist()
-        emails = [e for e in emails_raw if e and e.lower() != "nan"]
-        emails = list(dict.fromkeys(emails))
-
+        # Get ONLY the last 4 digits for the code
         digits = re.sub(r"\D", "", ref)
-        code = digits[:4] if len(digits) >= 4 else None
+        code = digits[-4:] if len(digits) >= 4 else None
 
         bookings.append({
             "reservation_code": ref,
@@ -186,9 +132,6 @@ def aggregate_bookings():
             "door_number": room,
             "check_in": check_in,
             "check_out": check_out,
-            "has_channel": has_channel,
-            "description": desc,
-            "emails": ";".join(emails),
             "code": code,
         })
 
@@ -205,7 +148,6 @@ def main():
         return
     tt.initialize_ttlock(client_id)
 
-    paid_refs = load_paid_refs()
     completed_map = load_completed_locks()
     bookings = aggregate_bookings()
 
@@ -221,7 +163,6 @@ def main():
         guest_name = booking["guest_name"]
         location = booking["property_location"]
         room_name = booking["door_number"]
-        has_channel = booking["has_channel"]
         code = booking["code"]
         check_in = booking["check_in"]
         check_out = booking["check_out"]
@@ -229,23 +170,13 @@ def main():
         print(f"\n📋 Evaluating reservation {ref} for guest '{guest_name}'")
         print(f"   Property: {location}, Room: {room_name}")
 
-        # Rule D: Check specifically if BOTH locks are already successful
+        # Check specifically if BOTH locks are already successful
         done_locks = completed_map.get(ref, set())
         
         # A reservation is skipped only when BOTH: a front door code has been successfully created, and a room door code has been successfully created
         if "front_door" in done_locks and "room" in done_locks:
             print(f"⏭️ Skipping {ref} – BOTH front door and room codes already successful.")
             continue
-
-        # Rule A & B: deposit/pre-auth logic
-        is_paid = ref in paid_refs
-        if has_channel and not is_paid:
-            print(f"⏭️ Skipping {ref} – platform booking with NO payment/pre-auth yet.")
-            continue
-        elif has_channel:
-            print(f"✅ {ref} is platform booking WITH payment – allowed.")
-        else:
-            print(f"✅ {ref} is non-platform booking – allowed without payment record.")
 
         if not code:
             print(f"⚠️ {ref}: could not derive a 4-digit code – skipping.")
@@ -258,7 +189,7 @@ def main():
         prop_conf = tt.PROPERTIES[location]
 
         # -----------------------------------------------------------------
-        # NEW LOGIC: Adjust check-in/out times
+        # Time Adjustments
         # -----------------------------------------------------------------
         # Check-in starts at 3:00 PM (15 hours offset) on the check_in date
         start_dt = check_in + timedelta(hours=15)
@@ -280,7 +211,7 @@ def main():
             if "front_door" in done_locks:
                 print(f"✅ Front door code already set for {ref} – skipping this lock.")
             else:
-                print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id})")
+                print(f"🚪 Attempting FRONT DOOR code for {location} (Lock ID {front_door_lock_id}) using code {code}")
                 total_attempts += 1
                 success, resp = tt.create_lock_code_simple(
                     front_door_lock_id,
@@ -326,7 +257,7 @@ def main():
             if "room" in done_locks:
                 print(f"✅ Room code already set for {ref} – skipping this lock.")
             else:
-                print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id})")
+                print(f"🚪 Attempting ROOM code for {location} – {room_name} (Lock ID {room_lock_id}) using code {code}")
                 total_attempts += 1
                 success, resp = tt.create_lock_code_simple(
                     room_lock_id,
