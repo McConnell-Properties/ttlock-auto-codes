@@ -14,7 +14,7 @@ CLIENT_SECRET = '19e2a1afb5bfada46f6559c346777017'  # ← correct secret
 USERNAME = 'info@mcconnell-properties.com'
 PASSWORD = 'Richard2026$'   # ← correct developer password
 
-OAUTH_HOST = 'https://api.sciener.com'
+OAUTH_HOST = 'https://euapi.ttlock.com'
 TTLOCK_API_BASE = 'https://euapi.ttlock.com'
 TOKEN_FILE = 'ttlock_token.json'
 
