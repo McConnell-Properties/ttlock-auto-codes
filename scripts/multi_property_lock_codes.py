@@ -22,7 +22,7 @@ TOKEN_FILE = 'ttlock_token.json'
 # PROPERTY CONFIG
 # -----------------------------
 PROPERTIES = {
-    "Tooting": {
+    "Tooting Stays": {
         "FRONT_DOOR_LOCK_ID": 20641052,
         "ROOM_LOCK_IDS": {
             'Room 1': 21318606,
@@ -33,7 +33,7 @@ PROPERTIES = {
             'Room 6': 21973872,
         },
     },
-    "Streatham": {
+    "Streatham Rooms": {
         "FRONT_DOOR_LOCK_ID": 16273050,
         "ROOM_LOCK_IDS": {
             'Room 1': 24719576,
@@ -43,20 +43,33 @@ PROPERTIES = {
             'Room 5': 24717236,
             'Room 6': 24717242,
             'Room 7': 26157268,
-            'Room 8': None,
+            'Room 8': 30947344,
             'Room 9': 24692300,
             'Room 10': 24717964,
             'Room 11': None,
         },
     },
-    "Norwich": {
-        "FRONT_DOOR_LOCK_ID": 17503964,
+    "Gassiot House": {
+        "FRONT_DOOR_LOCK_ID": 28606668,
         "ROOM_LOCK_IDS": {
-            'Room 1': None,
-            'Room 2': None,
-            'Room 3': None,
-            'Room 4': None,
-            'Room 5': None,
+            'Room 1': 31262246,
+            'Room 2': 31261208,
+            'Room 3': 31262700,
+            'Room 4': 31424108,
+            'Room 5': 31263276,
+            'Room 6': 31423836,
+            'Room 7': 31262938,
+        },
+    },
+    "Valnay Stays": {
+        "FRONT_DOOR_LOCK_ID": 27821908,
+        "ROOM_LOCK_IDS": {
+            'Room 1': 31453562,
+            'Room 2': 31285682,
+            'Room 3': 30948194,
+            'Room 4': 28062262,
+            'Room 5': 28065142,
+            'Room 6': 31284258,
         },
     },
 }
@@ -73,11 +86,9 @@ def load_token():
     except:
         return None
 
-
 def save_token(data):
     with open(TOKEN_FILE, "w") as f:
         json.dump(data, f, indent=2)
-
 
 def request_new_token():
     """Request a new TTLock OAuth token using developer credentials."""
@@ -113,7 +124,6 @@ def request_new_token():
     print("✅ Token refreshed and saved.")
     return data
 
-
 def get_access_token():
     """Return a valid access token, refreshing automatically."""
     token = load_token()
@@ -122,7 +132,6 @@ def get_access_token():
         token = request_new_token()
 
     return token["access_token"]
-
 
 # -----------------------------
 # CREATE LOCK CODE (WITH RETRIES)
@@ -199,7 +208,6 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
 
     print("❌ All retry attempts failed.")
     return False, f"Failed after {max_retries} retries"
-
 
 # -----------------------------
 # INITIALIZE CREDENTIALS
