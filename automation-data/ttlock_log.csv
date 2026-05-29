@@ -13,7 +13,6 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:05:09.016,BBN-BBE26052721078509,Jennifer Anderson,Streatham Rooms,Room 3,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780149600000.0,1780221600000.0
 2026-05-29T14:05:22.925,BBN-BBE26052821096055,Adrian Dzwonkowski,Gassiot House,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781532000000.0,1781863200000.0
 2026-05-29T14:05:25.531,BBN-BBE26052821096055,Adrian Dzwonkowski,Gassiot House,Room 5,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781532000000.0,1781863200000.0
-2026-05-29T14:05:38.692,BDC-5002356431,erinilson vaz,Gassiot House,Front Door,front_door,no,Failed to change passcode after 3 retries,1780236000000.0,1780826400000.0
 2026-05-29T14:05:45.038,BDC-5002356431,erinilson vaz,Gassiot House,Room 5,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780236000000.0,1780826400000.0
 2026-05-29T14:05:47.472,BDC-5002393760,Scott Swain,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780927200000.0,1781085600000.0
 2026-05-29T14:05:51.506,BDC-5002393760,Scott Swain,Streatham Rooms,Room 4,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780927200000.0,1781085600000.0
@@ -41,7 +40,6 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:06:54.614,BDC-5359450092,Paul Last,Streatham Rooms,Room 1,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781964000000.0,1782036000000.0
 2026-05-29T14:06:56.560,BDC-5394830569,Edith N'Da,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782136800000.0,1782295200000.0
 2026-05-29T14:06:58.753,BDC-5394830569,Edith N'Da,Streatham Rooms,Room 2,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782136800000.0,1782295200000.0
-2026-05-29T14:07:11.944,BDC-5405251781,Patricia Paola Pereda Urbina,Tooting Stays,Front Door,front_door,no,Failed to change passcode after 3 retries,1782482400000.0,1782640800000.0
 2026-05-29T14:07:14.253,BDC-5405251781,Patricia Paola Pereda Urbina,Tooting Stays,Room 1,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782482400000.0,1782640800000.0
 2026-05-29T14:07:18.192,BDC-5543075793,Reema Rasailee,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780149600000.0,1780308000000.0
 2026-05-29T14:07:20.137,BDC-5609126454,Drążkiewicz Mikołaj,Gassiot House,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780668000000.0,1780912800000.0
@@ -62,8 +60,6 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:08:08.685,BDC-5993973335,Andrea Perez,Gassiot House,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780063200000.0,1780221600000.0
 2026-05-29T14:08:11.093,BDC-5993973335,Andrea Perez,Gassiot House,Room 1,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780063200000.0,1780221600000.0
 2026-05-29T14:08:13.417,BDC-6094123123,Mariana Baridó,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781964000000.0,1782295200000.0
-2026-05-29T14:08:26.554,BDC-6094123123,Mariana Baridó,Streatham Rooms,Room 4,room,no,Failed to change passcode after 3 retries,1781964000000.0,1782295200000.0
-2026-05-29T14:08:39.710,BDC-6219790263,Mercy Obogwu,Gassiot House,Front Door,front_door,no,Failed to change passcode after 3 retries,1781100000000.0,1781431200000.0
 2026-05-29T14:08:43.299,BDC-6219790263,Mercy Obogwu,Gassiot House,Room 5,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781431200000.0
 2026-05-29T14:08:44.701,BDC-6314963444,Dominique Cristina Vergara De La Mare,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781690400000.0
 2026-05-29T14:08:46.611,BDC-6314963444,Dominique Cristina Vergara De La Mare,Streatham Rooms,Room 2,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781690400000.0
@@ -86,7 +82,6 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:09:29.488,BDC-6812300740,Deep Solanki,Tooting Stays,Room 2,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780063200000.0,1780135200000.0
 2026-05-29T14:09:35.067,BDC-6857018464,Ergün DİLAVEROĞLU,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782136800000.0,1784109600000.0
 2026-05-29T14:09:38.906,BDC-6857018464,Ergün DİLAVEROĞLU,Streatham Rooms,Room 4,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782136800000.0,1784109600000.0
-2026-05-29T14:09:40.185,BDC-6876822280,Robin Boch,Gassiot House,Front Door,front_door,no,Failed to change passcode after 3 retries,1782568800000.0,1782640800000.0
 2026-05-29T14:09:47.199,BDC-6876822280,Robin Boch,Gassiot House,Room 5,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1782568800000.0,1782640800000.0
 2026-05-29T14:09:49.202,BDC-6894565548,melissa cavinder,Valnay Stays,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780495200000.0,1780999200000.0
 2026-05-29T14:09:59.895,BDC-6894565548,melissa cavinder,Valnay Stays,Room 1,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780495200000.0,1780999200000.0
@@ -152,7 +147,6 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:13:05.287,LH26052156208190,David Akers,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781258400000.0
 2026-05-29T14:13:07.853,LH26052156208190,David Akers,Streatham Rooms,Room 5,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781258400000.0
 2026-05-29T14:13:16.568,LH26052156208224,Ava Deh,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781431200000.0
-2026-05-29T14:13:30.071,LH26052156208224,Ava Deh,Streatham Rooms,Room 4,room,no,Failed to change passcode after 3 retries,1781100000000.0,1781431200000.0
 2026-05-29T14:13:33.020,LH26052156208248,Maisey Hutchinson,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781877600000.0,1782036000000.0
 2026-05-29T14:13:34.592,LH26052156208296,Danni Godfrey,Streatham Rooms,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781964000000.0,1782036000000.0
 2026-05-29T14:13:36.953,LH26052156208711,Joao De Oliveria,Valnay Stays,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1781100000000.0,1781604000000.0
@@ -170,3 +164,9 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-29T14:14:31.935,LH26052756351771,Baoson Tang,Streatham Rooms,Room 9,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780149600000.0,1780308000000.0
 2026-05-29T14:14:34.265,LH26052856367535,Ashley Diaz,Gassiot House,Front Door,front_door,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780581600000.0,1780912800000.0
 2026-05-29T14:14:36.907,LH26052856367535,Ashley Diaz,Gassiot House,Room 3,room,yes,"{'errcode': 0, 'errmsg': 'none error message or means yes', 'description': '表示成功或是'}",1780581600000.0,1780912800000.0
+2026-05-29T16:27:43.751,BDC-5002356431,erinilson vaz,Gassiot House,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1780236000000,1780826400000
+2026-05-29T16:27:45.709,BDC-5405251781,Patricia Paola Pereda Urbina,Tooting Stays,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1782482400000,1782640800000
+2026-05-29T16:27:59.865,BDC-6094123123,Mariana Baridó,Streatham Rooms,Room 4,room,no,Failed after 3 retries,1781964000000,1782295200000
+2026-05-29T16:28:02.221,BDC-6219790263,Mercy Obogwu,Gassiot House,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1781100000000,1781431200000
+2026-05-29T16:28:03.303,BDC-6876822280,Robin Boch,Gassiot House,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1782568800000,1782640800000
+2026-05-29T16:28:04.476,LH26052156208224,Ava Deh,Streatham Rooms,Room 4,room,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1781100000000,1781431200000
