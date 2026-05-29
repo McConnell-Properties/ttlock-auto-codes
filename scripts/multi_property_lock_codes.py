@@ -210,6 +210,58 @@ def create_lock_code_simple(lock_id, code, name, start_ms, end_ms, description, 
     return False, f"Failed after {max_retries} retries"
 
 # -----------------------------
+# CHANGE LOCK CODE PERIOD (UPDATE)
+# -----------------------------
+def change_lock_code_period(lock_id, keyboard_pwd_id, start_ms, end_ms, max_retries=3):
+    """Modify the valid dates of an existing passcode using TTLock API."""
+    global CLIENT_ID
+
+    if not CLIENT_ID:
+        return False, "CLIENT_ID not set"
+
+    for attempt in range(1, max_retries + 1):
+        access_token = get_access_token()
+
+        payload = {
+            "clientId": CLIENT_ID,
+            "accessToken": access_token,
+            "lockId": lock_id,
+            "keyboardPwdId": keyboard_pwd_id,
+            "startDate": int(start_ms),
+            "endDate": int(end_ms),
+            "changeType": 2,  # 2 = Remote via Gateway/WiFi
+            "date": int(time.time() * 1000),
+        }
+
+        endpoint = f"{TTLOCK_API_BASE}/v3/keyboardPwd/change"
+        
+        try:
+            response = requests.post(
+                endpoint,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=12
+            )
+            
+            try:
+                result = response.json()
+            except:
+                continue
+
+            if result.get("errcode") == 0:
+                print("✅ TTLock code valid period updated successfully!")
+                return True, result
+
+            print(f"[ERROR] TTLock change error: {result}, retrying…")
+            continue
+
+        except Exception as e:
+            print(f"[ERROR] Exception: {e}, retrying…")
+            continue
+
+    return False, f"Failed to change passcode after {max_retries} retries"
+
+# -----------------------------
 # INITIALIZE CREDENTIALS
 # -----------------------------
 def initialize_ttlock(client_id):
