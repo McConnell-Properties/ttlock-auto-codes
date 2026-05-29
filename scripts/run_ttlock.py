@@ -2,7 +2,8 @@ import os
 import csv
 import re
 import glob
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -204,17 +205,19 @@ def main():
         prop_conf = tt.PROPERTIES[location]
 
         # -----------------------------------------------------------------
-        # Time Adjustments
+        # Time Adjustments (UK Timezone Aware)
         # -----------------------------------------------------------------
-        # Check-in starts at 3:00 PM (15 hours offset) on the check_in date
-        start_dt = check_in + timedelta(hours=15)
+        uk_tz = ZoneInfo("Europe/London")
+        
+        # Check-in starts at 3:00 PM (15:00) UK Time
+        start_dt = datetime.combine(check_in.date(), time(15, 0), tzinfo=uk_tz)
         start_ms = int(start_dt.timestamp() * 1000)
 
-        # Check-out ends at 11:00 AM (11 hours offset) on the check_out date
-        end_dt = check_out + timedelta(hours=11)
+        # Check-out ends at 11:00 AM (11:00) UK Time
+        end_dt = datetime.combine(check_out.date(), time(11, 0), tzinfo=uk_tz)
         end_ms = int(end_dt.timestamp() * 1000)
         
-        print(f"   Lock Time: {start_dt.strftime('%Y-%m-%d %H:%M')} to {end_dt.strftime('%Y-%m-%d %H:%M')}")
+        print(f"   Lock Time: {start_dt.strftime('%Y-%m-%d %H:%M %Z')} to {end_dt.strftime('%Y-%m-%d %H:%M %Z')}")
         # -----------------------------------------------------------------
 
         any_success_in_run = False
