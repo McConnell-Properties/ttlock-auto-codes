@@ -22,6 +22,10 @@ def parse_date(x):
 def combine_rows(group):
     row = group.iloc[0].copy()
 
+    # FIX: Explicitly save the reservation_code back into the row
+    # Newer versions of pandas remove it during the groupby operation!
+    row["reservation_code"] = group.name
+
     # Check-in/out (defensive)
     if "check_in_date" in group:
         cis = group["check_in_date"].dropna()
@@ -133,8 +137,13 @@ def main():
     final = (
         reservations.groupby("reservation_code", dropna=True)
         .apply(combine_rows)
-        .reset_index(drop=True)
     )
+    
+    # Safely reset the index depending on how pandas handled it
+    if "reservation_code" not in final.columns:
+        final = final.reset_index()
+    else:
+        final = final.reset_index(drop=True)
 
     # Preserve TTLock flags after grouping
     final["front_door_lock_set"] = final["reservation_code"].isin(
