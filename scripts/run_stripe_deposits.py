@@ -30,8 +30,7 @@ def load_stripe_logs():
         return set()
 
 def get_upcoming_bookings():
-    """Find bookings checking in within the next 2 days."""
-    # Specifically targets the new safe dropzone
+    """Find bookings needing a deposit link based on the length of stay rules."""
     all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
 
     if not all_csvs:
@@ -48,8 +47,6 @@ def get_upcoming_bookings():
         return []
 
     df = pd.concat(df_list, ignore_index=True)
-    
-    # Normalize headers for safety
     df.rename(columns=lambda c: str(c).strip().lower().replace(" ", "_"), inplace=True)
 
     if "booking_reference" not in df.columns:
@@ -58,18 +55,26 @@ def get_upcoming_bookings():
     df["reservation_code"] = df["booking_reference"].fillna("").astype(str).str.strip()
     df = df[df["reservation_code"] != ""]
     
-    if "check_in_date" in df.columns:
-        df["check_in"] = pd.to_datetime(df["check_in_date"], errors="coerce")
-    else:
-        df["check_in"] = pd.to_datetime(df.get("check_in_date"), errors="coerce")
-        
-    df = df.dropna(subset=["check_in"])
+    df["check_in"] = pd.to_datetime(df.get("check_in_date"), errors="coerce")
+    df["check_out"] = pd.to_datetime(df.get("check_out_date"), errors="coerce")
+    df = df.dropna(subset=["check_in", "check_out"])
 
     today = pd.Timestamp(date.today())
-    target_date = today + timedelta(days=2)
+    
+    # Calculate length of stay (number of nights)
+    df["nights"] = (df["check_out"] - df["check_in"]).dt.days
 
-    # Filter: Check-in is on or before 2 days from now (and hasn't been cancelled)
-    mask = df["check_in"] <= target_date
+    # Rule 1: Short stays (<= 5 nights) -> Trigger link 2 days before check-in
+    mask_short = (df["nights"] <= 5) & (today >= (df["check_in"] - pd.Timedelta(days=2)))
+    
+    # Rule 2: Long stays (> 5 nights) -> Trigger link 3 days before check-out
+    mask_long = (df["nights"] > 5) & (today >= (df["check_out"] - pd.Timedelta(days=3)))
+    
+    # Safety check: Ensure the guest hasn't already checked out
+    mask_active = today < df["check_out"]
+
+    # Combine filters
+    mask = (mask_short | mask_long) & mask_active
     df = df[mask].copy()
 
     bookings = []
@@ -105,7 +110,7 @@ def main():
     bookings = get_upcoming_bookings()
     
     if not bookings:
-        print("ℹ️ No eligible upcoming bookings found in dropzone.")
+        print("ℹ️ No eligible upcoming bookings found in dropzone matching the timing rules.")
         return
 
     new_logs = []
@@ -115,10 +120,10 @@ def main():
         if ref in processed_refs:
             continue  # Already generated a link for this booking
 
-        print(f"\n💳 Generating £80 Deposit Session for {ref} ({b['guest_name']})")
+        print(f"\n💳 Generating Standard 7-Day £80 Hold Session for {ref} ({b['guest_name']})")
         
         try:
-            # Create a Stripe Checkout Session for the Pre-Auth
+            # Create a Stripe Checkout Session for a standard authorization hold
             session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 mode='payment',
@@ -135,14 +140,8 @@ def main():
                     'quantity': 1,
                 }],
                 payment_intent_data={
-                    'capture_method': 'manual', # THIS MAKES IT A HOLD, NOT A CHARGE
+                    'capture_method': 'manual', # This ensures it's an authorization hold, not a direct charge
                 },
-                payment_method_options={
-                    'card': {
-                        'request_extended_authorization': 'if_available' # OPTION B: 30-DAY HOLD
-                    }
-                },
-                # Placeholder URLs until you have a real website to send them back to
                 success_url='https://mcconnell-properties.com/', 
                 cancel_url='https://mcconnell-properties.com/',
                 metadata={
