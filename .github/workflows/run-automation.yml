@@ -70,16 +70,20 @@ jobs:
         run: python scripts/run_stripe_deposits.py
 
       # ---------------------------
-      # STEP 5 — UPDATE GOOGLE SHEETS (OPTIONAL)
+      # STEP 5 — AUTOMATIC CLEANUP (DROPZONE WIPE)
       # ---------------------------
-      # (we skip this for now)
+      - name: Wipe Raw Input Data
+        run: |
+          echo "🧹 Cleaning up raw reservation files..."
+          # Delete any CSV file that is NOT a persistent log file
+          find automation-data/ -type f -name "*.csv" ! -name "ttlock_log.csv" ! -name "stripe_deposit_log.csv" ! -name "reservation_status.csv" -delete
 
       # ===========================================================
-      # FINAL SAFE COMMIT — NEVER FAILS OR REJECTS
+      # FINAL SAFE COMMIT — REGISTERS UPDATES AND DELETIONS
       # ===========================================================
-      - name: Stage CSV changes
+      - name: Stage all changes (including deletions)
         run: |
-          git add automation-data/ || true
+          git add -A automation-data/ || true
 
       - name: Check if anything changed
         id: changes
@@ -99,5 +103,5 @@ jobs:
           git fetch origin main
           git reset --soft origin/main
 
-          git commit -m "Update automation CSV logs"
+          git commit -m "Process daily reservations and flush dropzone"
           git push origin main
