@@ -60,13 +60,22 @@ jobs:
       - name: Build combined reservation summary CSV
         run: python scripts/build_reservation_status.py
 
+        # ---------------------------
+      # STEP 4A — CHECK EXISTING STRIPE DEPOSITS
       # ---------------------------
-      # STEP 4 — RUN STRIPE DEPOSITS
+      - name: Check Stripe Payment Statuses
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: python scripts/check_stripe_status.py
+
+      # ---------------------------
+      # STEP 4B — RUN STRIPE DEPOSITS
       # ---------------------------
       - name: Run Stripe Pre-Auth Generator
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: python scripts/run_stripe_deposits.py
+
 
       # ---------------------------
       # STEP 5 — AUTOMATIC CLEANUP (DROPZONE WIPE)
