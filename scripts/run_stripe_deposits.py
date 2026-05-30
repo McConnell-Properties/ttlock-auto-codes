@@ -31,6 +31,7 @@ def load_stripe_logs():
 
 def get_upcoming_bookings():
     """Find bookings checking in within the next 2 days."""
+    # Specifically targets the new safe dropzone
     all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
 
     if not all_csvs:
@@ -47,21 +48,27 @@ def get_upcoming_bookings():
         return []
 
     df = pd.concat(df_list, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
+    
+    # Normalize headers for safety
+    df.rename(columns=lambda c: str(c).strip().lower().replace(" ", "_"), inplace=True)
 
-    if "Booking reference" not in df.columns:
+    if "booking_reference" not in df.columns:
         return []
 
-    df["reservation_code"] = df["Booking reference"].fillna("").astype(str).str.strip()
+    df["reservation_code"] = df["booking_reference"].fillna("").astype(str).str.strip()
     df = df[df["reservation_code"] != ""]
     
-    df["check_in"] = pd.to_datetime(df["Check in date"], errors="coerce")
+    if "check_in_date" in df.columns:
+        df["check_in"] = pd.to_datetime(df["check_in_date"], errors="coerce")
+    else:
+        df["check_in"] = pd.to_datetime(df.get("check_in_date"), errors="coerce")
+        
     df = df.dropna(subset=["check_in"])
 
     today = pd.Timestamp(date.today())
     target_date = today + timedelta(days=2)
 
-    # Filter: Check-in is on or before 2 days from now (and hasn't been cancelled in our view)
+    # Filter: Check-in is on or before 2 days from now (and hasn't been cancelled)
     mask = df["check_in"] <= target_date
     df = df[mask].copy()
 
@@ -69,16 +76,16 @@ def get_upcoming_bookings():
     for ref, g in df.groupby("reservation_code"):
         first = g.iloc[0]
         
-        fname = str(first.get("Guest first name", "")).strip()
-        lname = str(first.get("Guest last name", "")).strip()
+        fname = str(first.get("guest_first_name", "")).strip()
+        lname = str(first.get("guest_last_name", "")).strip()
         guest = f"{fname} {lname}".strip().replace("nan", "")
-        email = str(first.get("Guest email", "")).strip()
+        email = str(first.get("guest_email", "")).strip()
         
         bookings.append({
             "reservation_code": ref,
             "guest_name": guest,
             "guest_email": email if email.lower() != "nan" else None,
-            "property_location": first.get("Property name", ""),
+            "property_location": first.get("property_name", ""),
             "check_in": first["check_in"].strftime("%Y-%m-%d")
         })
 
@@ -98,7 +105,7 @@ def main():
     bookings = get_upcoming_bookings()
     
     if not bookings:
-        print("ℹ️ No eligible upcoming bookings found.")
+        print("ℹ️ No eligible upcoming bookings found in dropzone.")
         return
 
     new_logs = []
@@ -129,10 +136,10 @@ def main():
                 }],
                 payment_intent_data={
                     'capture_method': 'manual', # THIS MAKES IT A HOLD, NOT A CHARGE
-                    'payment_method_options': {
-                        'card': {
-                            'request_extended_authorization': 'true' # OPTION B: 30-DAY HOLD
-                        }
+                },
+                payment_method_options={
+                    'card': {
+                        'request_extended_authorization': 'if_available' # OPTION B: 30-DAY HOLD
                     }
                 },
                 # Placeholder URLs until you have a real website to send them back to
