@@ -184,4 +184,4 @@ def main():
     print("=== Stripe Pre-Authorization Automation Complete ===")
 
 if __name__ == "__main__":
-    main()run_stripe_deposits.py
+    main()
