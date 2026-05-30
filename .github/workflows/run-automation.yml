@@ -32,7 +32,7 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install pandas requests stripe
+          pip install pandas requests stripe gspread oauth2client
 
       # ---------------------------
       # ENV VARS
@@ -60,7 +60,7 @@ jobs:
       - name: Build combined reservation summary CSV
         run: python scripts/build_reservation_status.py
 
-        # ---------------------------
+      # ---------------------------
       # STEP 4A — CHECK EXISTING STRIPE DEPOSITS
       # ---------------------------
       - name: Check Stripe Payment Statuses
@@ -76,8 +76,7 @@ jobs:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: python scripts/run_stripe_deposits.py
 
-
-        # ---------------------------
+      # ---------------------------
       # STEP 5 — PUSH DATA TO GOOGLE SHEETS
       # ---------------------------
       - name: Export Data to Google Sheets
@@ -86,9 +85,8 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: python scripts/push_to_sheets.py
 
-
       # ---------------------------
-      # STEP 5 — AUTOMATIC CLEANUP (DROPZONE WIPE)
+      # STEP 6 — AUTOMATIC CLEANUP (DROPZONE WIPE)
       # ---------------------------
       - name: Wipe Raw Input Data
         run: |
