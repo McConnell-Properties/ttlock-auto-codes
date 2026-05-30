@@ -17,6 +17,7 @@ jobs:
       # ---------------------------
       # CHECKOUT
       # ---------------------------
+      # Decouple historical depths for efficiency
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -32,7 +33,7 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install pandas requests
+          pip install pandas requests stripe
 
       # ---------------------------
       # ENV VARS
@@ -54,13 +55,22 @@ jobs:
       - name: Parse TTLock logs
         run: python scripts/ttlock_log_parser.py
 
-      # ----------------------------------------------------------
-  
+      # ---------------------------
+      # STEP 3 — RESERVATION SUMMARY
+      # ---------------------------
       - name: Build combined reservation summary CSV
         run: python scripts/build_reservation_status.py
 
       # ---------------------------
-      # STEP 3 — UPDATE GOOGLE SHEETS (OPTIONAL)
+      # STEP 4 — RUN STRIPE DEPOSITS
+      # ---------------------------
+      - name: Run Stripe Pre-Auth Generator
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: python scripts/run_stripe_deposits.py
+
+      # ---------------------------
+      # STEP 5 — UPDATE GOOGLE SHEETS (OPTIONAL)
       # ---------------------------
       # (we skip this for now)
 
