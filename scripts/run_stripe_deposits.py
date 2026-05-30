@@ -31,8 +31,7 @@ def load_stripe_logs():
 
 def get_upcoming_bookings():
     """Find bookings checking in within the next 2 days."""
-    all_csvs = [f for f in glob.glob(f"{DATA_DIR}/**/*.csv", recursive=True) 
-                if not f.endswith("ttlock_log.csv") and not f.endswith("reservation_status.csv") and not f.endswith("stripe_deposit_log.csv")]
+    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
 
     if not all_csvs:
         return []
