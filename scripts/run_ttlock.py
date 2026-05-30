@@ -90,8 +90,7 @@ def load_completed_locks():
 
 def aggregate_bookings():
     """Load all CSVs in subfolders, apply date filters, merge duplicate rows."""
-    all_csvs = [f for f in glob.glob(f"{DATA_DIR}/**/*.csv", recursive=True) 
-                if not f.endswith("ttlock_log.csv") and not f.endswith("reservation_status.csv")]
+    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
 
     if not all_csvs:
         print(f"⚠️ No reservation CSVs found in {DATA_DIR}/ subfolders – aborting TTLock step.")
