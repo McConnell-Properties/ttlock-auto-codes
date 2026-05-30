@@ -77,6 +77,16 @@ jobs:
         run: python scripts/run_stripe_deposits.py
 
 
+        # ---------------------------
+      # STEP 5 — PUSH DATA TO GOOGLE SHEETS
+      # ---------------------------
+      - name: Export Data to Google Sheets
+        env:
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python scripts/push_to_sheets.py
+
+
       # ---------------------------
       # STEP 5 — AUTOMATIC CLEANUP (DROPZONE WIPE)
       # ---------------------------
