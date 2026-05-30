@@ -17,7 +17,6 @@ jobs:
       # ---------------------------
       # CHECKOUT
       # ---------------------------
-      # Decouple historical depths for efficiency
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -74,9 +73,8 @@ jobs:
       # ---------------------------
       - name: Wipe Raw Input Data
         run: |
-          echo "🧹 Cleaning up raw reservation files..."
-          # Delete any CSV file that is NOT a persistent log file
-          find automation-data/ -type f -name "*.csv" ! -name "ttlock_log.csv" ! -name "stripe_deposit_log.csv" ! -name "reservation_status.csv" -delete
+          echo "🧹 Cleaning up raw reservation files from dropzone..."
+          rm -f automation-data/inputs/*.csv
 
       # ===========================================================
       # FINAL SAFE COMMIT — REGISTERS UPDATES AND DELETIONS
