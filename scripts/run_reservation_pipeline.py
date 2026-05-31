@@ -60,19 +60,20 @@ def load_existing_log_data():
         if df.empty:
             return completed_locks, active_stripe_links
         
-        # Ensure standard formatting columns exist
-        for col in ["start_ms", "end_ms", "stripe_timestamp", "stripe_status"]:
+        # SAFE GUARD: Dynamically ensure ALL standard formatting columns exist 
+        # to avoid KeyErrors if reading a legacy or custom tracking file
+        for col in LOG_FIELDNAMES:
             if col not in df.columns:
                 df[col] = ""
 
         # --- 1. Parse Active Stripe Links ---
-        df_stripe = df.dropna(subset=["reservation_code", "stripe_timestamp"]).copy()
+        df_stripe = df.dropna(subset=["reservation_code"]).copy()
+        df_stripe = df_stripe[df_stripe["stripe_timestamp"] != ""]
+        
         if not df_stripe.empty:
             df_stripe["stripe_ts_dt"] = pd.to_datetime(df_stripe["stripe_timestamp"], errors="coerce")
             # Sort newest first so we get the latest generated link per booking reference
             df_stripe = df_stripe.sort_values(by="stripe_ts_dt", ascending=False)
-            
-            expiration_cutoff = datetime.utcnow() - timedelta(hours=24)
             
             for _, row in df_stripe.drop_duplicates(subset=["reservation_code"], keep="first").iterrows():
                 ref = row["reservation_code"]
@@ -390,8 +391,6 @@ def main():
         # -------------------------------------------------------------
         # STEP 3: HANDLE STRIPE PROGRESS LOG RETENTION
         # -------------------------------------------------------------
-        # If a fresh Stripe link was generated but the lock codes were skipped 
-        # (meaning no new row was logged above), write an entry anyway to save the new link.
         if new_stripe_generated:
             if not fd_row_written and front_door_lock_id:
                 fd_info = done_locks_info.get("front_door")
