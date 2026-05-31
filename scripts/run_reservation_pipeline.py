@@ -66,31 +66,58 @@ def main():
     # ==========================================
     bookings_state = {}
 
-    # 1A. Load Existing Status Log
+    # 1A. Load Existing Status Log & Check Live Stripe Statuses
     if os.path.exists(LOG_PATH):
         try:
             df_old = pd.read_csv(LOG_PATH, dtype=str)
-            # Ensure all columns exist
             for col in LOG_FIELDNAMES:
                 if col not in df_old.columns:
                     df_old[col] = ""
             
-            # Sort old to new so latest updates win
             df_old["tmp_ts"] = pd.to_datetime(df_old["timestamp"], errors="coerce")
             df_old = df_old.sort_values(by="tmp_ts", ascending=True)
 
-            for _, row in df_old.dropna(subset=["reservation_code"]).iterrows():
-                ref = row["reservation_code"].strip()
-                ltype = row.get("lock_type", "").strip() or "room"
+            print("🔍 Syncing live Stripe statuses for active holds...")
+            
+            for index, row in df_old.iterrows():
+                ref = str(row.get("reservation_code", "")).strip()
+                if not ref or ref.lower() == "nan": continue
+
+                ltype = str(row.get("lock_type", "")).strip() or "room"
                 
+                # --- LIVE STRIPE STATUS REFRESH ---
+                status = str(row.get("stripe_status", ""))
+                session_id = str(row.get("stripe_session_id", ""))
+                
+                if status in ["link_generated", "hold_active"] and session_id and session_id.lower() != "nan":
+                    try:
+                        session = stripe.checkout.Session.retrieve(session_id, expand=['payment_intent'])
+                        new_status = status
+                        
+                        if session.status == "open":
+                            pass # Guest hasn't paid yet
+                        elif session.status == "complete" and session.payment_intent:
+                            pi_status = session.payment_intent.status
+                            if pi_status == "requires_capture":
+                                new_status = "hold_active"
+                            elif pi_status == "succeeded":
+                                new_status = "captured"
+                            elif pi_status == "canceled":
+                                new_status = "released"
+                        elif session.status == "expired":
+                            new_status = "link_expired"
+
+                        if new_status != status:
+                            df_old.at[index, "stripe_status"] = new_status
+                            print(f"   🔄 Stripe Updated for {ref}: '{status}' -> '{new_status}'")
+                            row["stripe_status"] = new_status # Update local row copy for state building
+                    except Exception as e:
+                        print(f"   ⚠️ Error checking Stripe session for {ref}: {e}")
+                # ----------------------------------
+
                 if ref not in bookings_state:
-                    bookings_state[ref] = {
-                        "core": {},
-                        "locks": {},
-                        "stripe": {}
-                    }
+                    bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}}
                 
-                # Load Core Details
                 bookings_state[ref]["core"] = {
                     "guest_name": row.get("guest_name", ""),
                     "guest_email": row.get("guest_email", ""),
@@ -100,7 +127,6 @@ def main():
                     "check_out": row.get("check_out", "")
                 }
                 
-                # Load Lock Details
                 bookings_state[ref]["locks"][ltype] = {
                     "code_created": row.get("code_created", "no"),
                     "ttlock_response": row.get("ttlock_response", ""),
@@ -108,7 +134,6 @@ def main():
                     "end_ms": row.get("end_ms", "")
                 }
                 
-                # Load Stripe Details (we only need one stripe record per booking)
                 if str(row.get("stripe_timestamp", "")).strip():
                     bookings_state[ref]["stripe"] = {
                         "stripe_session_id": row.get("stripe_session_id", ""),
@@ -169,7 +194,6 @@ def main():
     for ref, state in bookings_state.items():
         core = state["core"]
         
-        # Skip incomplete data or past bookings
         if not core.get("check_out") or not core.get("check_in"): continue
         
         co_dt = pd.to_datetime(core["check_out"], errors="coerce")
@@ -195,22 +219,22 @@ def main():
         stripe_data = state["stripe"]
         nights = (co_dt - ci_dt).days
         
-        # Determine if timing rules dictate a link is needed right now
         trigger_stripe = False
         if nights <= 5 and today_ts >= (ci_dt - pd.Timedelta(days=2)):
             trigger_stripe = True
         elif nights > 5 and today_ts >= (co_dt - pd.Timedelta(days=3)):
             trigger_stripe = True
 
-        # Check if we already have a valid link
         is_valid_link = False
         if stripe_data.get("stripe_timestamp"):
             s_ts = pd.to_datetime(stripe_data["stripe_timestamp"], errors="coerce")
             is_expired = pd.notna(s_ts) and (datetime.utcnow() - s_ts.to_pydatetime() > timedelta(hours=24))
             status_str = str(stripe_data.get("stripe_status", "")).lower()
-            is_paid = any(x in status_str for x in ["paid", "succeed", "captured"])
             
-            if (not is_expired) or is_paid:
+            # Treat active holds, captured payments, and manual overrides as valid
+            is_secured = any(x in status_str for x in ["paid", "succeed", "captured", "hold_active"])
+            
+            if (not is_expired) or is_secured:
                 is_valid_link = True
 
         if trigger_stripe and not is_valid_link:
@@ -233,7 +257,7 @@ def main():
             except Exception as e:
                 print(f"      ❌ Stripe Error: {e}")
         elif trigger_stripe and is_valid_link:
-            print(f"   💳 Deposit timing met. Existing link is active/paid.")
+            print(f"   💳 Deposit timing met. Existing link is active/secured ({stripe_data.get('stripe_status')}).")
         else:
             print(f"   ⏳ Deposit timing NOT met yet (Stay: {nights} nights). Skipping Stripe.")
 
@@ -296,7 +320,6 @@ def main():
 
     final_df = pd.DataFrame(final_log_rows, columns=LOG_FIELDNAMES)
     
-    # Fill missing columns
     for col in LOG_FIELDNAMES:
         if col not in final_df.columns: final_df[col] = ""
     
