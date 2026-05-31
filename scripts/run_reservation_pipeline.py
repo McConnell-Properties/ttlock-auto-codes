@@ -20,8 +20,8 @@ CURRENCY = "gbp"
 
 DATA_DIR = "automation-data"
 LOG_PATH = "automation-data/reservation_status.csv"
+LEGACY_STRIPE_LOG = "automation-data/stripe_deposit_log.csv"
 
-# Unified Headers tracking both Lock State and Stripe Link Metrics
 LOG_FIELDNAMES = [
     "timestamp",
     "reservation_code",
@@ -47,68 +47,91 @@ LOG_FIELDNAMES = [
 # -----------------------------
 def sync_and_load_master_state():
     """
-    Step 1 of the pipeline: Reads existing tracking logs and merges new dropzone 
-    CSV files to build a single, perfectly updated master record array before 
-    any API activities run. Includes automated date recovery for legacy logs.
+    Step 1 of the pipeline: Merges existing logs, legacy separate stripe files,
+    and fresh dropzone files into one master state dictionary matrix.
     """
-    today = pd.Timestamp(date.today())
+    today = date.today()
     master_records = {}
     uk_tz = ZoneInfo("Europe/London")
 
-    # --- 1. Load Existing Logs ---
+    print(f"📅 Current Automation System Date: {today.strftime('%Y-%m-%d')}")
+
+    # --- 1. Load Existing Reservation Status Base ---
     if os.path.exists(LOG_PATH):
         try:
             df_old = pd.read_csv(LOG_PATH, dtype=str)
+            print(f"📖 Found reservation_status.csv with {len(df_old)} rows.")
             
-            # Guard against completely missing columns from older log formats
             for col in LOG_FIELDNAMES:
                 if col not in df_old.columns:
                     df_old[col] = ""
             
-            # Sort chronologically so the newest historical logs settle on top
             df_old["tmp_ts"] = pd.to_datetime(df_old["timestamp"], errors="coerce")
             df_old = df_old.sort_values(by="tmp_ts", ascending=True)
 
-            for _, row in df_old.dropna(subset=["reservation_code", "lock_type"]).iterrows():
+            for _, row in df_old.dropna(subset=["reservation_code"]).iterrows():
                 ref = row["reservation_code"]
-                ltype = row["lock_type"]
+                ltype = row.get("lock_type", "room")
+                if not ltype or str(ltype).strip() == "": ltype = "room"
+                
                 row_dict = row.to_dict()
 
-                # --- SELF HEALING DATA RECOVERY ENGINE ---
-                # If explicit text dates are empty but lock millisecond timestamps exist, calculate them back!
+                # Reverse-engineer text check-in/out dates from TTLock ms timestamps if empty
                 start_ms_val = row_dict.get("start_ms", "")
                 end_ms_val = row_dict.get("end_ms", "")
 
-                if (not row_dict.get("check_in")) and pd.notna(start_ms_val) and str(start_ms_val).strip() != "":
+                if (not row_dict.get("check_in")) and start_ms_val:
                     try:
                         ms = int(float(start_ms_val))
                         row_dict["check_in"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
                     except: pass
                     
-                if (not row_dict.get("check_out")) and pd.notna(end_ms_val) and str(end_ms_val).strip() != "":
+                if (not row_dict.get("check_out")) and end_ms_val:
                     try:
                         ms = int(float(end_ms_val))
                         row_dict["check_out"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
                     except: pass
-                # ----------------------------------------
                 
                 if ref not in master_records:
                     master_records[ref] = {}
-                
                 master_records[ref][ltype] = row_dict
         except Exception as e:
             print(f"⚠️ Warning reading baseline history file: {e}")
 
-    # --- 2. Ingest New Dropzone Files ---
+    # --- 2. BACK-MIGRATE LEGACY STRIPE SEPARATE DATA ---
+    if os.path.exists(LEGACY_STRIPE_LOG):
+        try:
+            df_stripe = pd.read_csv(LEGACY_STRIPE_LOG, dtype=str)
+            print(f"💳 Found legacy stripe_deposit_log.csv with {len(df_stripe)} links. Migrating data...")
+            
+            df_stripe["tmp_s_ts"] = pd.to_datetime(df_stripe["timestamp"], errors="coerce")
+            df_stripe = df_stripe.sort_values(by="tmp_s_ts", ascending=True)
+
+            for _, s_row in df_stripe.dropna(subset=["reservation_code"]).iterrows():
+                ref = s_row["reservation_code"]
+                
+                # Check if this booking reference exists in our active master records
+                if ref in master_records:
+                    for ltype in master_records[ref]:
+                        # Only port over link metrics if the target fields are currently empty
+                        if not master_records[ref][ltype].get("stripe_payment_url"):
+                            master_records[ref][ltype].update({
+                                "stripe_session_id": s_row.get("session_id", ""),
+                                "stripe_payment_url": s_row.get("payment_url", ""),
+                                "stripe_status": s_row.get("status", "link_generated"),
+                                "stripe_timestamp": s_row.get("timestamp", "")
+                            })
+        except Exception as se:
+            print(f"⚠️ Warning migrating legacy Stripe file records: {se}")
+
+    # --- 3. Ingest New Dropzone Files ---
     all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
     if all_csvs:
-        print(f"📥 Found raw data in dropzone. Parsing uploads for profile updates...")
+        print(f"📥 Found raw data files in dropzone. Parsing uploads...")
         df_list = []
         for file in all_csvs:
-            try:
-                df_list.append(pd.read_csv(file, dtype=str))
-            except:
-                continue
+            try: df_list.append(pd.read_csv(file, dtype=str))
+            except: continue
         
         if df_list:
             df_new = pd.concat(df_list, ignore_index=True)
@@ -125,7 +148,7 @@ def sync_and_load_master_state():
                     first = g.iloc[0]
                     co_dt = g["check_out_dt"].max()
                     
-                    if co_dt.date() < date.today():
+                    if co_dt.date() < today:
                         continue
 
                     fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
@@ -158,16 +181,31 @@ def sync_and_load_master_state():
                             "check_out": co_str
                         })
 
-    # --- 3. Filter out expired historical entries ---
+    # --- 4. Filter out expired entries with strict diagnostic logging ---
     active_state_matrix = []
+    print("\n🔍 --- DIAGNOSTIC CALENDAR EVALUATION ---")
+    
     for ref, tracks in master_records.items():
         for ltype, record in tracks.items():
+            guest = record.get("guest_name", "Unknown Guest")
             co_str = record.get("check_out", "")
-            if co_str:
-                co_dt = pd.to_datetime(co_str, errors="coerce")
-                if pd.notna(co_dt) and co_dt.date() >= date.today():
-                    active_state_matrix.append(record)
+            
+            if not co_str:
+                print(f"❌ Skipped {ref} ({guest}) [{ltype}] -> Reason: No check-out date found.")
+                continue
+                
+            co_dt = pd.to_datetime(co_str, errors="coerce")
+            if pd.isna(co_dt):
+                print(f"❌ Skipped {ref} ({guest}) [{ltype}] -> Reason: Date '{co_str}' failed to parse.")
+                continue
+                
+            if co_dt.date() >= today:
+                print(f"✅ Active Tracked Row: {ref} ({guest}) — Checkout: {co_str} — Stripe Url Status: {'Loaded' if record.get('stripe_payment_url') else 'Empty'}")
+                active_state_matrix.append(record)
+            else:
+                print(f"⚠️ Skipped {ref} ({guest}) [{ltype}] -> Reason: Stay expired ({co_str}).")
 
+    print("-------------------------------------------\n")
     print(f"✔ State Synchronization Complete. Tracked active rows: {len(active_state_matrix)}")
     return active_state_matrix
 
@@ -188,14 +226,14 @@ def main():
         print("❌ STRIPE_SECRET_KEY not set in environment – cannot proceed.")
         return
 
-    # RUN PHASE 1: Load, Ingest, and Auto-Recover state layout attributes
+    # RUN PHASE 1: Load, Ingest, Auto-Recover, and Cross-Migrate metrics
     active_rows = sync_and_load_master_state()
 
     if not active_rows:
         print("ℹ️ No active tracked reservations found to evaluate. Exiting pipeline.")
         return
 
-    print("🚀 Evaluating required activities directly off the master state database...")
+    print(f"🚀 Evaluating required activities directly off the {len(active_rows)} master state records...")
     processed_log_rows = []
 
     for row in active_rows:
