@@ -88,6 +88,12 @@ def clean_crm_int(val):
     try: return int(float(str(val).strip()))
     except: return 0
 
+def clean_crm_phone(phone_str):
+    """Forces Google Sheets to treat phone numbers as text by adding an invisible apostrophe."""
+    if not phone_str: return ""
+    phone_str = str(phone_str).strip()
+    return f"'{phone_str}"
+
 def sync_crm_dashboard_live(client):
     print("🚀 Starting CRM Dashboard Smart Update processing...")
     
@@ -108,7 +114,6 @@ def sync_crm_dashboard_live(client):
     crm_grid = crm_sheet.get_all_values()
 
     # Map existing CRM rows by reservation_code (Column A)
-    # This tracks the physical row number on the spreadsheet
     crm_row_map = {}
     for idx, row in enumerate(crm_grid):
         if idx == 0: continue  # Skip the header row
@@ -152,7 +157,7 @@ def sync_crm_dashboard_live(client):
             row.get("guest_first_name", ""),                   # G
             row.get("guest_last_name", ""),                    # H
             row.get("guest_email", ""),                        # I
-            row.get("guest_phone_number", ""),                 # J
+            clean_crm_phone(row.get("guest_phone_number", "")),# J: Protected Phone Number
             row.get("guest_organisation", ""),                 # K
             row.get("guest_address", ""),                      # L
             row.get("guest_address2", ""),                     # M
