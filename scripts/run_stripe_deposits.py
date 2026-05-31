@@ -18,15 +18,34 @@ LOG_FIELDNAMES = ["timestamp", "reservation_code", "guest_name", "property_locat
 # -----------------------------
 # HELPERS
 # -----------------------------
-def load_stripe_logs():
-    """Load existing deposit logs so we don't create duplicate sessions."""
+def load_active_stripe_refs():
+    """
+    Load reservation codes that have a valid, unexpired session link.
+    If a link was generated over 24 hours ago and is still pending, 
+    we allow it to be regenerated.
+    """
     if not os.path.exists(LOG_FILE):
         return set()
     try:
         df = pd.read_csv(LOG_FILE, dtype=str)
-        return set(df["reservation_code"].dropna().unique())
+        if df.empty:
+            return set()
+            
+        # Convert timestamp to a datetime object for comparison
+        df["timestamp_dt"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        
+        # Define the expiration cutoff (24 hours ago)
+        expiration_cutoff = datetime.utcnow() - timedelta(hours=24)
+        
+        # A link is considered "still active" if it is under 24 hours old 
+        # OR if it has been marked as fully paid/succeeded.
+        active_mask = (df["timestamp_dt"] >= expiration_cutoff) | (df["status"].str.lower().str.contains("paid|succeed|captured", na=False))
+        
+        active_refs = set(df[active_mask]["reservation_code"].dropna().unique())
+        return active_refs
+        
     except Exception as e:
-        print(f"⚠️ Could not read {LOG_FILE}: {e}")
+        print(f"⚠️ Could not evaluate active logs from {LOG_FILE}: {e}")
         return set()
 
 def get_upcoming_bookings():
@@ -106,7 +125,8 @@ def main():
         print("❌ STRIPE_SECRET_KEY not set in environment – cannot proceed.")
         return
 
-    processed_refs = load_stripe_logs()
+    # Call the new smart filter function instead
+    active_refs = load_active_stripe_refs()
     bookings = get_upcoming_bookings()
     
     if not bookings:
@@ -117,10 +137,10 @@ def main():
 
     for b in bookings:
         ref = b["reservation_code"]
-        if ref in processed_refs:
-            continue  # Already generated a link for this booking
+        if ref in active_refs:
+            continue  # Skips only if there's a live link < 24 hrs old, or if already paid
 
-        print(f"\n💳 Generating Standard 7-Day £80 Hold Session for {ref} ({b['guest_name']})")
+        print(f"\n💳 Generating/Regenerating Standard 7-Day £80 Hold Session for {ref} ({b['guest_name']})")
         
         try:
             # Create a Stripe Checkout Session for a standard authorization hold
@@ -164,7 +184,7 @@ def main():
                 "status": "link_generated"
             })
             
-            processed_refs.add(ref)
+            active_refs.add(ref)
 
         except Exception as e:
             print(f"❌ Stripe Error for {ref}: {e}")
