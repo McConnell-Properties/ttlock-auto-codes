@@ -20,7 +20,6 @@ CURRENCY = "gbp"
 
 DATA_DIR = "automation-data"
 LOG_PATH = "automation-data/reservation_status.csv"
-LEGACY_STRIPE_LOG = "automation-data/stripe_deposit_log.csv"
 
 LOG_FIELDNAMES = [
     "timestamp",
@@ -43,175 +42,7 @@ LOG_FIELDNAMES = [
 ]
 
 # -----------------------------
-# PHASE 1: INGESTION & STATE SYNC
-# -----------------------------
-def sync_and_load_master_state():
-    """
-    Step 1 of the pipeline: Merges existing logs, legacy separate stripe files,
-    and fresh dropzone files into one master state dictionary matrix.
-    """
-    today = date.today()
-    master_records = {}
-    uk_tz = ZoneInfo("Europe/London")
-
-    print(f"📅 Current Automation System Date: {today.strftime('%Y-%m-%d')}")
-
-    # --- 1. Load Existing Reservation Status Base ---
-    if os.path.exists(LOG_PATH):
-        try:
-            df_old = pd.read_csv(LOG_PATH, dtype=str)
-            print(f"📖 Found reservation_status.csv with {len(df_old)} rows.")
-            
-            for col in LOG_FIELDNAMES:
-                if col not in df_old.columns:
-                    df_old[col] = ""
-            
-            df_old["tmp_ts"] = pd.to_datetime(df_old["timestamp"], errors="coerce")
-            df_old = df_old.sort_values(by="tmp_ts", ascending=True)
-
-            for _, row in df_old.dropna(subset=["reservation_code"]).iterrows():
-                ref = row["reservation_code"]
-                ltype = row.get("lock_type", "room")
-                if not ltype or str(ltype).strip() == "": ltype = "room"
-                
-                row_dict = row.to_dict()
-
-                # Reverse-engineer text check-in/out dates from TTLock ms timestamps if empty
-                start_ms_val = row_dict.get("start_ms", "")
-                end_ms_val = row_dict.get("end_ms", "")
-
-                if (not row_dict.get("check_in")) and start_ms_val:
-                    try:
-                        ms = int(float(start_ms_val))
-                        row_dict["check_in"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
-                    except: pass
-                    
-                if (not row_dict.get("check_out")) and end_ms_val:
-                    try:
-                        ms = int(float(end_ms_val))
-                        row_dict["check_out"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
-                    except: pass
-                
-                if ref not in master_records:
-                    master_records[ref] = {}
-                master_records[ref][ltype] = row_dict
-        except Exception as e:
-            print(f"⚠️ Warning reading baseline history file: {e}")
-
-    # --- 2. BACK-MIGRATE LEGACY STRIPE SEPARATE DATA ---
-    if os.path.exists(LEGACY_STRIPE_LOG):
-        try:
-            df_stripe = pd.read_csv(LEGACY_STRIPE_LOG, dtype=str)
-            print(f"💳 Found legacy stripe_deposit_log.csv with {len(df_stripe)} links. Migrating data...")
-            
-            df_stripe["tmp_s_ts"] = pd.to_datetime(df_stripe["timestamp"], errors="coerce")
-            df_stripe = df_stripe.sort_values(by="tmp_s_ts", ascending=True)
-
-            for _, s_row in df_stripe.dropna(subset=["reservation_code"]).iterrows():
-                ref = s_row["reservation_code"]
-                
-                # Check if this booking reference exists in our active master records
-                if ref in master_records:
-                    for ltype in master_records[ref]:
-                        # Only port over link metrics if the target fields are currently empty
-                        if not master_records[ref][ltype].get("stripe_payment_url"):
-                            master_records[ref][ltype].update({
-                                "stripe_session_id": s_row.get("session_id", ""),
-                                "stripe_payment_url": s_row.get("payment_url", ""),
-                                "stripe_status": s_row.get("status", "link_generated"),
-                                "stripe_timestamp": s_row.get("timestamp", "")
-                            })
-        except Exception as se:
-            print(f"⚠️ Warning migrating legacy Stripe file records: {se}")
-
-    # --- 3. Ingest New Dropzone Files ---
-    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
-    if all_csvs:
-        print(f"📥 Found raw data files in dropzone. Parsing uploads...")
-        df_list = []
-        for file in all_csvs:
-            try: df_list.append(pd.read_csv(file, dtype=str))
-            except: continue
-        
-        if df_list:
-            df_new = pd.concat(df_list, ignore_index=True)
-            df_new.columns = [c.strip() for c in df_new.columns]
-            
-            if "Booking reference" in df_new.columns:
-                df_new["reservation_code"] = df_new["Booking reference"].fillna("").astype(str).str.strip()
-                df_new = df_new[df_new["reservation_code"] != ""].copy()
-                df_new["check_in_dt"] = pd.to_datetime(df_new["Check in date"], errors="coerce")
-                df_new["check_out_dt"] = pd.to_datetime(df_new["Check out date"], errors="coerce")
-                df_new = df_new.dropna(subset=["check_in_dt", "check_out_dt"])
-
-                for ref, g in df_new.groupby("reservation_code"):
-                    first = g.iloc[0]
-                    co_dt = g["check_out_dt"].max()
-                    
-                    if co_dt.date() < today:
-                        continue
-
-                    fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
-                    lname = str(first.get("Guest last name", "")).strip().replace("nan", "")
-                    guest = f"{fname} {lname}".strip()
-                    email = str(first.get("Guest email", "")).strip()
-                    if email.lower() == "nan" or not email: email = ""
-                    
-                    location = first.get("Property name", "") or ""
-                    room = first.get("Rooms", "") or ""
-                    ci_str = g["check_in_dt"].min().strftime("%Y-%m-%d")
-                    co_str = co_dt.strftime("%Y-%m-%d")
-
-                    for ltype in ["front_door", "room"]:
-                        if ref not in master_records:
-                            master_records[ref] = {}
-                        
-                        if ltype not in master_records[ref]:
-                            master_records[ref][ltype] = {col: "" for col in LOG_FIELDNAMES}
-                            master_records[ref][ltype]["reservation_code"] = ref
-                            master_records[ref][ltype]["lock_type"] = ltype
-                            master_records[ref][ltype]["code_created"] = "no"
-
-                        master_records[ref][ltype].update({
-                            "guest_name": guest,
-                            "guest_email": email if email else master_records[ref][ltype].get("guest_email", ""),
-                            "property_location": location,
-                            "door_number": room,
-                            "check_in": ci_str,
-                            "check_out": co_str
-                        })
-
-    # --- 4. Filter out expired entries with strict diagnostic logging ---
-    active_state_matrix = []
-    print("\n🔍 --- DIAGNOSTIC CALENDAR EVALUATION ---")
-    
-    for ref, tracks in master_records.items():
-        for ltype, record in tracks.items():
-            guest = record.get("guest_name", "Unknown Guest")
-            co_str = record.get("check_out", "")
-            
-            if not co_str:
-                print(f"❌ Skipped {ref} ({guest}) [{ltype}] -> Reason: No check-out date found.")
-                continue
-                
-            co_dt = pd.to_datetime(co_str, errors="coerce")
-            if pd.isna(co_dt):
-                print(f"❌ Skipped {ref} ({guest}) [{ltype}] -> Reason: Date '{co_str}' failed to parse.")
-                continue
-                
-            if co_dt.date() >= today:
-                print(f"✅ Active Tracked Row: {ref} ({guest}) — Checkout: {co_str} — Stripe Url Status: {'Loaded' if record.get('stripe_payment_url') else 'Empty'}")
-                active_state_matrix.append(record)
-            else:
-                print(f"⚠️ Skipped {ref} ({guest}) [{ltype}] -> Reason: Stay expired ({co_str}).")
-
-    print("-------------------------------------------\n")
-    print(f"✔ State Synchronization Complete. Tracked active rows: {len(active_state_matrix)}")
-    return active_state_matrix
-
-
-# -----------------------------
-# PHASE 2: ACTIVITY EXECUTION
+# CORE PIPELINE LOGIC
 # -----------------------------
 def main():
     print("=== Unified Reservation Status Pipeline Start ===")
@@ -226,146 +57,251 @@ def main():
         print("❌ STRIPE_SECRET_KEY not set in environment – cannot proceed.")
         return
 
-    # RUN PHASE 1: Load, Ingest, Auto-Recover, and Cross-Migrate metrics
-    active_rows = sync_and_load_master_state()
+    today_date = date.today()
+    today_ts = pd.Timestamp(today_date)
+    uk_tz = ZoneInfo("Europe/London")
 
-    if not active_rows:
-        print("ℹ️ No active tracked reservations found to evaluate. Exiting pipeline.")
-        return
+    # ==========================================
+    # PHASE 1: BUILD & UPDATE MASTER STATE
+    # ==========================================
+    bookings_state = {}
 
-    print(f"🚀 Evaluating required activities directly off the {len(active_rows)} master state records...")
-    processed_log_rows = []
+    # 1A. Load Existing Status Log
+    if os.path.exists(LOG_PATH):
+        try:
+            df_old = pd.read_csv(LOG_PATH, dtype=str)
+            # Ensure all columns exist
+            for col in LOG_FIELDNAMES:
+                if col not in df_old.columns:
+                    df_old[col] = ""
+            
+            # Sort old to new so latest updates win
+            df_old["tmp_ts"] = pd.to_datetime(df_old["timestamp"], errors="coerce")
+            df_old = df_old.sort_values(by="tmp_ts", ascending=True)
 
-    for row in active_rows:
-        ref = row["reservation_code"]
-        guest_name = row["guest_name"]
-        email = row["guest_email"] if row["guest_email"] else None
-        location = row["property_location"]
-        room_name = row["door_number"]
-        ltype = row["lock_type"]
+            for _, row in df_old.dropna(subset=["reservation_code"]).iterrows():
+                ref = row["reservation_code"].strip()
+                ltype = row.get("lock_type", "").strip() or "room"
+                
+                if ref not in bookings_state:
+                    bookings_state[ref] = {
+                        "core": {},
+                        "locks": {},
+                        "stripe": {}
+                    }
+                
+                # Load Core Details
+                bookings_state[ref]["core"] = {
+                    "guest_name": row.get("guest_name", ""),
+                    "guest_email": row.get("guest_email", ""),
+                    "property_location": row.get("property_location", ""),
+                    "door_number": row.get("door_number", ""),
+                    "check_in": row.get("check_in", ""),
+                    "check_out": row.get("check_out", "")
+                }
+                
+                # Load Lock Details
+                bookings_state[ref]["locks"][ltype] = {
+                    "code_created": row.get("code_created", "no"),
+                    "ttlock_response": row.get("ttlock_response", ""),
+                    "start_ms": row.get("start_ms", ""),
+                    "end_ms": row.get("end_ms", "")
+                }
+                
+                # Load Stripe Details (we only need one stripe record per booking)
+                if str(row.get("stripe_timestamp", "")).strip():
+                    bookings_state[ref]["stripe"] = {
+                        "stripe_session_id": row.get("stripe_session_id", ""),
+                        "stripe_payment_url": row.get("stripe_payment_url", ""),
+                        "stripe_status": row.get("stripe_status", "link_generated"),
+                        "stripe_timestamp": row.get("stripe_timestamp", "")
+                    }
+        except Exception as e:
+            print(f"⚠️ Warning reading history file: {e}")
+
+    # 1B. Ingest New Dropzone Data (Overwrites old core data)
+    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
+    if all_csvs:
+        print(f"📥 Parsing new reservations from dropzone...")
+        df_list = []
+        for file in all_csvs:
+            try: df_list.append(pd.read_csv(file, dtype=str))
+            except: pass
         
+        if df_list:
+            df_in = pd.concat(df_list, ignore_index=True)
+            df_in.columns = [c.strip() for c in df_in.columns]
+            
+            if "Booking reference" in df_in.columns:
+                df_in["reservation_code"] = df_in["Booking reference"].fillna("").astype(str).str.strip()
+                df_in = df_in[df_in["reservation_code"] != ""]
+                df_in["check_in_dt"] = pd.to_datetime(df_in.get("Check in date"), errors="coerce")
+                df_in["check_out_dt"] = pd.to_datetime(df_in.get("Check out date"), errors="coerce")
+                df_in = df_in.dropna(subset=["check_in_dt", "check_out_dt"])
+
+                for ref, g in df_in.groupby("reservation_code"):
+                    first = g.iloc[0]
+                    co_dt = g["check_out_dt"].max()
+                    
+                    if ref not in bookings_state:
+                        bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}}
+
+                    fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
+                    lname = str(first.get("Guest last name", "")).strip().replace("nan", "")
+                    guest = f"{fname} {lname}".strip()
+                    email = str(first.get("Guest email", "")).strip().replace("nan", "")
+
+                    bookings_state[ref]["core"].update({
+                        "guest_name": guest,
+                        "guest_email": email if email else bookings_state[ref]["core"].get("guest_email", ""),
+                        "property_location": first.get("Property name", "") or "",
+                        "door_number": first.get("Rooms", "") or "",
+                        "check_in": g["check_in_dt"].min().strftime("%Y-%m-%d"),
+                        "check_out": co_dt.strftime("%Y-%m-%d")
+                    })
+
+    # ==========================================
+    # PHASE 2: EVALUATE & EXECUTE TASKS
+    # ==========================================
+    print(f"\n🚀 Evaluating activities for {len(bookings_state)} recorded bookings...")
+    final_log_rows = []
+
+    for ref, state in bookings_state.items():
+        core = state["core"]
+        
+        # Skip incomplete data or past bookings
+        if not core.get("check_out") or not core.get("check_in"): continue
+        
+        co_dt = pd.to_datetime(core["check_out"], errors="coerce")
+        ci_dt = pd.to_datetime(core["check_in"], errors="coerce")
+        
+        if pd.isna(co_dt) or pd.isna(ci_dt) or co_dt.date() < today_date:
+            continue  # Skip expired stays
+
+        location = core["property_location"]
+        room_name = core["door_number"]
+        guest_name = core["guest_name"]
+        email = core["guest_email"]
+
         digits = re.sub(r"\D", "", ref)
         code = digits[-4:] if len(digits) >= 4 else None
 
         if not code or location not in tt.PROPERTIES:
-            processed_log_rows.append(row)
             continue
 
-        prop_conf = tt.PROPERTIES[location]
-        ci_dt = pd.to_datetime(row["check_in"])
-        co_dt = pd.to_datetime(row["check_out"])
+        print(f"\n📋 Processing {ref} ({guest_name}) - {location}")
 
-        uk_tz = ZoneInfo("Europe/London")
+        # --- STRIPE EVALUATION ---
+        stripe_data = state["stripe"]
+        nights = (co_dt - ci_dt).days
+        
+        # Determine if timing rules dictate a link is needed right now
+        trigger_stripe = False
+        if nights <= 5 and today_ts >= (ci_dt - pd.Timedelta(days=2)):
+            trigger_stripe = True
+        elif nights > 5 and today_ts >= (co_dt - pd.Timedelta(days=3)):
+            trigger_stripe = True
+
+        # Check if we already have a valid link
+        is_valid_link = False
+        if stripe_data.get("stripe_timestamp"):
+            s_ts = pd.to_datetime(stripe_data["stripe_timestamp"], errors="coerce")
+            is_expired = pd.notna(s_ts) and (datetime.utcnow() - s_ts.to_pydatetime() > timedelta(hours=24))
+            status_str = str(stripe_data.get("stripe_status", "")).lower()
+            is_paid = any(x in status_str for x in ["paid", "succeed", "captured"])
+            
+            if (not is_expired) or is_paid:
+                is_valid_link = True
+
+        if trigger_stripe and not is_valid_link:
+            print(f"   💳 Deposit timing met. Link missing/expired. Generating...")
+            try:
+                session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    mode='payment',
+                    customer_email=email if email else None,
+                    line_items=[{'price_data': {'currency': CURRENCY, 'product_data': {'name': f"Security Deposit - {location}", 'description': f"Refundable hold for {ref}"}, 'unit_amount': DEPOSIT_AMOUNT}, 'quantity': 1}],
+                    payment_intent_data={'capture_method': 'manual'},
+                    success_url='https://mcconnell-properties.com/', cancel_url='https://mcconnell-properties.com/',
+                    metadata={'reservation_code': ref, 'guest_name': guest_name, 'property': location}
+                )
+                stripe_data.update({
+                    "stripe_session_id": session.id, "stripe_payment_url": session.url,
+                    "stripe_status": "link_generated", "stripe_timestamp": datetime.utcnow().isoformat()
+                })
+                print(f"      ✅ Generated: {session.url}")
+            except Exception as e:
+                print(f"      ❌ Stripe Error: {e}")
+        elif trigger_stripe and is_valid_link:
+            print(f"   💳 Deposit timing met. Existing link is active/paid.")
+        else:
+            print(f"   ⏳ Deposit timing NOT met yet (Stay: {nights} nights). Skipping Stripe.")
+
+        # --- TTLOCK EVALUATION ---
+        prop_conf = tt.PROPERTIES[location]
         start_dt = datetime.combine(ci_dt.date(), time(15, 0), tzinfo=uk_tz)
         start_ms = int(start_dt.timestamp() * 1000)
         end_dt = datetime.combine(co_dt.date(), time(11, 0), tzinfo=uk_tz)
         end_ms = int(end_dt.timestamp() * 1000)
 
-        row["timestamp"] = datetime.utcnow().isoformat()
+        for ltype in ["front_door", "room"]:
+            lock_id = None
+            if ltype == "front_door": lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
+            elif ltype == "room": lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
 
-        # --- TASK A: MONITOR STRIPE DEPOSIT LINKS ---
-        stripe_ts_str = row.get("stripe_timestamp", "")
-        stripe_status_str = str(row.get("stripe_status", "")).lower()
-        
-        is_link_valid = False
-        if stripe_ts_str:
-            ts_dt = pd.to_datetime(stripe_ts_str, errors="coerce")
-            is_expired = pd.notna(ts_dt) and (datetime.utcnow() - ts_dt.to_pydatetime() > timedelta(hours=24))
-            is_paid = any(x in stripe_status_str for x in ["paid", "succeed", "captured"])
-            if (not is_expired) or is_paid:
-                is_link_valid = True
+            if not lock_id: continue
 
-        if is_link_valid:
-            pass
-        else:
-            print(f"   💳 Stripe Link Needed for {ref} ({guest_name}). Requesting Checkout Session...")
-            try:
-                session = stripe.checkout.Session.create(
-                    payment_method_types=['card'],
-                    mode='payment',
-                    customer_email=email,
-                    line_items=[{
-                        'price_data': {
-                            'currency': CURRENCY,
-                            'product_data': {
-                                'name': f"Security Deposit - {location}",
-                                'description': f"Refundable damage hold for booking {ref}",
-                            },
-                            'unit_amount': DEPOSIT_AMOUNT,
-                        },
-                        'quantity': 1,
-                    }],
-                    payment_intent_data={'capture_method': 'manual'},
-                    success_url='https://mcconnell-properties.com/', 
-                    cancel_url='https://mcconnell-properties.com/',
-                    metadata={'reservation_code': ref, 'guest_name': guest_name, 'property': location}
-                )
-                row["stripe_session_id"] = session.id
-                row["stripe_payment_url"] = session.url
-                row["stripe_status"] = "link_generated"
-                row["stripe_timestamp"] = datetime.utcnow().isoformat()
-                print(f"      ✅ Link generated: {session.url}")
-            except Exception as se:
-                print(f"      ❌ Stripe Error: {se}")
-
-        # --- TASK B: MONITOR TTLOCK ACCESS CODES ---
-        code_created = row.get("code_created", "no")
-        raw_response_str = row.get("ttlock_response", "")
-
-        target_lock_id = None
-        if ltype == "front_door":
-            target_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
-        elif ltype == "room":
-            target_lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
-
-        if target_lock_id:
-            if code_created == "yes":
-                old_start = row.get("start_ms", "")
-                old_end = row.get("end_ms", "")
-                dates_changed = (str(old_start) != str(start_ms)) or (str(old_end) != str(end_ms))
-                
-                if dates_changed:
+            l_data = state["locks"].get(ltype, {"code_created": "no", "ttlock_response": "", "start_ms": "", "end_ms": ""})
+            
+            if l_data["code_created"] == "yes":
+                if str(l_data["start_ms"]) == str(start_ms) and str(l_data["end_ms"]) == str(end_ms):
+                    print(f"   ✅ {ltype} code matches calendar window.")
+                else:
                     pwd_id = None
-                    try:
-                        resp_dict = ast.literal_eval(raw_response_str)
-                        pwd_id = resp_dict.get("keyboardPwdId")
+                    try: pwd_id = ast.literal_eval(l_data["ttlock_response"]).get("keyboardPwdId")
                     except: pass
                     
                     if pwd_id:
-                        print(f"   🔄 Scheduling window modification for {ref} — Lock ID {target_lock_id}")
-                        success, resp = tt.change_lock_code_period(target_lock_id, pwd_id, start_ms, end_ms)
-                        row["code_created"] = "yes" if success else "no"
-                        row["ttlock_response"] = str(resp)
-                        row["start_ms"] = start_ms
-                        row["end_ms"] = end_ms
+                        print(f"   🔄 Dates changed. Modifying {ltype} window...")
+                        success, resp = tt.change_lock_code_period(lock_id, pwd_id, start_ms, end_ms)
+                        l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms})
                     else:
-                        code_created = "no"
+                        l_data["code_created"] = "no"
 
-            if code_created != "yes":
-                print(f"   🚪 Generating hardware access credentials for {ref} — Type: {ltype.upper()}")
-                desc_label = "Front Door" if ltype == "front_door" else room_name
-                success, resp = tt.create_lock_code_simple(target_lock_id, code, guest_name, start_ms, end_ms, f"{desc_label} ({location})", ref)
-                
-                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
-                    success = True
-                    
-                row["code_created"] = "yes" if success else "no"
-                row["ttlock_response"] = str(resp)
-                row["start_ms"] = start_ms
-                row["end_ms"] = end_ms
+            if l_data["code_created"] != "yes":
+                print(f"   🚪 Generating {ltype} code...")
+                desc = "Front Door" if ltype == "front_door" else room_name
+                success, resp = tt.create_lock_code_simple(lock_id, code, guest_name, start_ms, end_ms, f"{desc} ({location})", ref)
+                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007: success = True
+                l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms})
 
-        processed_log_rows.append(row)
+            # Append the completed row object to our final output list
+            final_row = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "reservation_code": ref,
+                "lock_type": ltype
+            }
+            final_row.update(core)
+            final_row.update(l_data)
+            final_row.update(stripe_data)
+            final_log_rows.append(final_row)
 
-    # --- SAVE UPDATED MASTER LOG FILE ---
-    print("\n📝 Committing changes to local storage tracker...")
-    final_df = pd.DataFrame(processed_log_rows, columns=LOG_FIELDNAMES)
-    final_df["timestamp"] = pd.to_datetime(final_df["timestamp"], errors='coerce')
+    # ==========================================
+    # PHASE 3: WRITE MASTER LOG
+    # ==========================================
+    print("\n📝 Refreshing unified tracking table...")
+    if not final_log_rows:
+        print("ℹ️ No rows to write.")
+        return
+
+    final_df = pd.DataFrame(final_log_rows, columns=LOG_FIELDNAMES)
     
-    final_df = final_df.sort_values(by=['timestamp'], ascending=False).drop_duplicates(
-        subset=['reservation_code', 'lock_type'], keep='first'
-    ).sort_values(by=['timestamp'], ascending=True)
-
-    final_df['timestamp'] = final_df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f').str[:-3]
+    # Fill missing columns
+    for col in LOG_FIELDNAMES:
+        if col not in final_df.columns: final_df[col] = ""
+    
+    final_df = final_df.reindex(columns=LOG_FIELDNAMES)
+    
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     final_df.to_csv(LOG_PATH, index=False, quoting=csv.QUOTE_MINIMAL)
     
