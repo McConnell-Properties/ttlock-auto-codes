@@ -21,6 +21,7 @@ CURRENCY = "gbp"
 DATA_DIR = "automation-data"
 LOG_PATH = "automation-data/reservation_status.csv"
 
+# Unified Headers tracking both Lock State and Stripe Link Metrics
 LOG_FIELDNAMES = [
     "timestamp",
     "reservation_code",
@@ -48,15 +49,18 @@ def sync_and_load_master_state():
     """
     Step 1 of the pipeline: Reads existing tracking logs and merges new dropzone 
     CSV files to build a single, perfectly updated master record array before 
-    any API activities run.
+    any API activities run. Includes automated date recovery for legacy logs.
     """
     today = pd.Timestamp(date.today())
     master_records = {}
+    uk_tz = ZoneInfo("Europe/London")
 
     # --- 1. Load Existing Logs ---
     if os.path.exists(LOG_PATH):
         try:
             df_old = pd.read_csv(LOG_PATH, dtype=str)
+            
+            # Guard against completely missing columns from older log formats
             for col in LOG_FIELDNAMES:
                 if col not in df_old.columns:
                     df_old[col] = ""
@@ -68,11 +72,30 @@ def sync_and_load_master_state():
             for _, row in df_old.dropna(subset=["reservation_code", "lock_type"]).iterrows():
                 ref = row["reservation_code"]
                 ltype = row["lock_type"]
+                row_dict = row.to_dict()
+
+                # --- SELF HEALING DATA RECOVERY ENGINE ---
+                # If explicit text dates are empty but lock millisecond timestamps exist, calculate them back!
+                start_ms_val = row_dict.get("start_ms", "")
+                end_ms_val = row_dict.get("end_ms", "")
+
+                if (not row_dict.get("check_in")) and pd.notna(start_ms_val) and str(start_ms_val).strip() != "":
+                    try:
+                        ms = int(float(start_ms_val))
+                        row_dict["check_in"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
+                    except: pass
+                    
+                if (not row_dict.get("check_out")) and pd.notna(end_ms_val) and str(end_ms_val).strip() != "":
+                    try:
+                        ms = int(float(end_ms_val))
+                        row_dict["check_out"] = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
+                    except: pass
+                # ----------------------------------------
                 
                 if ref not in master_records:
                     master_records[ref] = {}
                 
-                master_records[ref][ltype] = row.to_dict()
+                master_records[ref][ltype] = row_dict
         except Exception as e:
             print(f"⚠️ Warning reading baseline history file: {e}")
 
@@ -98,16 +121,13 @@ def sync_and_load_master_state():
                 df_new["check_out_dt"] = pd.to_datetime(df_new["Check out date"], errors="coerce")
                 df_new = df_new.dropna(subset=["check_in_dt", "check_out_dt"])
 
-                # Group to isolate unique reservation changes
                 for ref, g in df_new.groupby("reservation_code"):
                     first = g.iloc[0]
                     co_dt = g["check_out_dt"].max()
                     
-                    # Skip historical files that already checked out
                     if co_dt.date() < date.today():
                         continue
 
-                    # Extract the clean updated metadata metrics
                     fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
                     lname = str(first.get("Guest last name", "")).strip().replace("nan", "")
                     guest = f"{fname} {lname}".strip()
@@ -119,19 +139,16 @@ def sync_and_load_master_state():
                     ci_str = g["check_in_dt"].min().strftime("%Y-%m-%d")
                     co_str = co_dt.strftime("%Y-%m-%d")
 
-                    # Apply updates down both possible lock tracks (front_door and room)
                     for ltype in ["front_door", "room"]:
                         if ref not in master_records:
                             master_records[ref] = {}
                         
-                        # If it's a brand new booking, initialize an empty dictionary row layout
                         if ltype not in master_records[ref]:
                             master_records[ref][ltype] = {col: "" for col in LOG_FIELDNAMES}
                             master_records[ref][ltype]["reservation_code"] = ref
                             master_records[ref][ltype]["lock_type"] = ltype
                             master_records[ref][ltype]["code_created"] = "no"
 
-                        # Overwrite core reservation data with the fresh dropzone inputs
                         master_records[ref][ltype].update({
                             "guest_name": guest,
                             "guest_email": email if email else master_records[ref][ltype].get("guest_email", ""),
@@ -140,8 +157,6 @@ def sync_and_load_master_state():
                             "check_in": ci_str,
                             "check_out": co_str
                         })
-            else:
-                print("⚠️ 'Booking reference' header missing in dropzone files.")
 
     # --- 3. Filter out expired historical entries ---
     active_state_matrix = []
@@ -163,7 +178,6 @@ def sync_and_load_master_state():
 def main():
     print("=== Unified Reservation Status Pipeline Start ===")
     
-    # Authenticate Lock Core Ecosystem
     client_id = os.getenv("TTLOCK_CLIENT_ID")
     if not client_id:
         print("❌ TTLOCK_CLIENT_ID not set in environment – cannot proceed.")
@@ -174,7 +188,7 @@ def main():
         print("❌ STRIPE_SECRET_KEY not set in environment – cannot proceed.")
         return
 
-    # RUN PHASE 1: Load and Ingest state rows explicitly up front
+    # RUN PHASE 1: Load, Ingest, and Auto-Recover state layout attributes
     active_rows = sync_and_load_master_state()
 
     if not active_rows:
@@ -192,7 +206,6 @@ def main():
         room_name = row["door_number"]
         ltype = row["lock_type"]
         
-        # Calculate trailing 4 digits from reservation string for lock passcodes
         digits = re.sub(r"\D", "", ref)
         code = digits[-4:] if len(digits) >= 4 else None
 
@@ -203,9 +216,7 @@ def main():
         prop_conf = tt.PROPERTIES[location]
         ci_dt = pd.to_datetime(row["check_in"])
         co_dt = pd.to_datetime(row["check_out"])
-        nights = (co_dt - ci_dt).days
 
-        # Setup Time Adjustments (Europe/London Timezone Mapping)
         uk_tz = ZoneInfo("Europe/London")
         start_dt = datetime.combine(ci_dt.date(), time(15, 0), tzinfo=uk_tz)
         start_ms = int(start_dt.timestamp() * 1000)
@@ -214,7 +225,7 @@ def main():
 
         row["timestamp"] = datetime.utcnow().isoformat()
 
-        # --- TASK A: MONITOR STRIPE ACCESS HOLD LINKS ---
+        # --- TASK A: MONITOR STRIPE DEPOSIT LINKS ---
         stripe_ts_str = row.get("stripe_timestamp", "")
         stripe_status_str = str(row.get("stripe_status", "")).lower()
         
@@ -227,7 +238,6 @@ def main():
                 is_link_valid = True
 
         if is_link_valid:
-            # Re-use current valid token properties natively mapped on the row object
             pass
         else:
             print(f"   💳 Stripe Link Needed for {ref} ({guest_name}). Requesting Checkout Session...")
@@ -260,11 +270,10 @@ def main():
             except Exception as se:
                 print(f"      ❌ Stripe Error: {se}")
 
-        # --- TASK B: MONITOR TTLOCK CODE DEPLOYMENTS ---
+        # --- TASK B: MONITOR TTLOCK ACCESS CODES ---
         code_created = row.get("code_created", "no")
         raw_response_str = row.get("ttlock_response", "")
 
-        # Target lock hardware metrics context
         target_lock_id = None
         if ltype == "front_door":
             target_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
@@ -273,10 +282,8 @@ def main():
 
         if target_lock_id:
             if code_created == "yes":
-                # Check if dates were changed in Phase 1
                 old_start = row.get("start_ms", "")
                 old_end = row.get("end_ms", "")
-                
                 dates_changed = (str(old_start) != str(start_ms)) or (str(old_end) != str(end_ms))
                 
                 if dates_changed:
@@ -294,8 +301,7 @@ def main():
                         row["start_ms"] = start_ms
                         row["end_ms"] = end_ms
                     else:
-                        print(f"   ⚠️ Date shift detected for {ref}, but missing internal Password ID token. Re-creating entry code...")
-                        code_created = "no" # Force re-creation down fallback tracking index
+                        code_created = "no"
 
             if code_created != "yes":
                 print(f"   🚪 Generating hardware access credentials for {ref} — Type: {ltype.upper()}")
@@ -303,7 +309,7 @@ def main():
                 success, resp = tt.create_lock_code_simple(target_lock_id, code, guest_name, start_ms, end_ms, f"{desc_label} ({location})", ref)
                 
                 if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
-                    success = True # Overpass lock-level duplicate designations gracefully
+                    success = True
                     
                 row["code_created"] = "yes" if success else "no"
                 row["ttlock_response"] = str(resp)
@@ -312,12 +318,11 @@ def main():
 
         processed_log_rows.append(row)
 
-    # --- SAVE UPDATED LOG DATA ---
+    # --- SAVE UPDATED MASTER LOG FILE ---
     print("\n📝 Committing changes to local storage tracker...")
     final_df = pd.DataFrame(processed_log_rows, columns=LOG_FIELDNAMES)
     final_df["timestamp"] = pd.to_datetime(final_df["timestamp"], errors='coerce')
     
-    # Maintain clean table sorting configurations
     final_df = final_df.sort_values(by=['timestamp'], ascending=False).drop_duplicates(
         subset=['reservation_code', 'lock_type'], keep='first'
     ).sort_values(by=['timestamp'], ascending=True)
