@@ -49,10 +49,11 @@ def load_active_stripe_refs():
         return set()
 
 def get_upcoming_bookings():
-    """Find bookings needing a deposit link based on the length of stay rules."""
+    """Find bookings needing a deposit link, including expired links that need regeneration."""
     all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
 
     if not all_csvs:
+        print("⚠️ No CSV files found in the inputs dropzone.")
         return []
 
     df_list = []
@@ -69,6 +70,7 @@ def get_upcoming_bookings():
     df.rename(columns=lambda c: str(c).strip().lower().replace(" ", "_"), inplace=True)
 
     if "booking_reference" not in df.columns:
+        print("⚠️ 'booking_reference' column missing from input CSVs.")
         return []
 
     df["reservation_code"] = df["booking_reference"].fillna("").astype(str).str.strip()
@@ -79,39 +81,44 @@ def get_upcoming_bookings():
     df = df.dropna(subset=["check_in", "check_out"])
 
     today = pd.Timestamp(date.today())
-    
-    # Calculate length of stay (number of nights)
     df["nights"] = (df["check_out"] - df["check_in"]).dt.days
 
-    # Rule 1: Short stays (<= 5 nights) -> Trigger link 2 days before check-in
-    mask_short = (df["nights"] <= 5) & (today >= (df["check_in"] - pd.Timedelta(days=2)))
-    
-    # Rule 2: Long stays (> 5 nights) -> Trigger link 3 days before check-out
-    mask_long = (df["nights"] > 5) & (today >= (df["check_out"] - pd.Timedelta(days=3)))
-    
-    # Safety check: Ensure the guest hasn't already checked out
-    mask_active = today < df["check_out"]
-
-    # Combine filters
-    mask = (mask_short | mask_long) & mask_active
-    df = df[mask].copy()
+    # Load currently active refs to identify what has already expired
+    active_refs = load_active_stripe_refs()
 
     bookings = []
     for ref, g in df.groupby("reservation_code"):
         first = g.iloc[0]
+        checkout_date = first["check_out"]
         
-        fname = str(first.get("guest_first_name", "")).strip()
-        lname = str(first.get("guest_last_name", "")).strip()
-        guest = f"{fname} {lname}".strip().replace("nan", "")
-        email = str(first.get("guest_email", "")).strip()
-        
-        bookings.append({
-            "reservation_code": ref,
-            "guest_name": guest,
-            "guest_email": email if email.lower() != "nan" else None,
-            "property_location": first.get("property_name", ""),
-            "check_in": first["check_in"].strftime("%Y-%m-%d")
-        })
+        # Safety Check: If the guest has already checked out completely, skip them
+        if today >= checkout_date:
+            continue
+
+        # --- FORCE REGENERATION OVERRIDE ---
+        # If this reservation exists in our data dropzone, but does NOT have 
+        # an active link (< 24 hours old or paid) in our logs, FORCE it to process immediately.
+        if ref not in active_refs:
+            force_process = True
+        else:
+            # Otherwise, fall back to standard timing rules for brand new bookings
+            mask_short = (first["nights"] <= 5) & (today >= (first["check_in"] - pd.Timedelta(days=2)))
+            mask_long = (first["nights"] > 5) & (today >= (first["check_out"] - pd.Timedelta(days=3)))
+            force_process = mask_short | mask_long
+
+        if force_process:
+            fname = str(first.get("guest_first_name", "")).strip()
+            lname = str(first.get("guest_last_name", "")).strip()
+            guest = f"{fname} {lname}".strip().replace("nan", "")
+            email = str(first.get("guest_email", "")).strip()
+            
+            bookings.append({
+                "reservation_code": ref,
+                "guest_name": guest,
+                "guest_email": email if email.lower() != "nan" else None,
+                "property_location": first.get("property_name", ""),
+                "check_in": first["check_in"].strftime("%Y-%m-%d")
+            })
 
     return bookings
 
