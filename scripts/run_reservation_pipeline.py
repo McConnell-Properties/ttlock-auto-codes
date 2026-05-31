@@ -116,7 +116,7 @@ def main():
                 # ----------------------------------
 
                 if ref not in bookings_state:
-                    bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}}
+                    bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}, "timestamp": row.get("timestamp")}
                 
                 bookings_state[ref]["core"] = {
                     "guest_name": row.get("guest_name", ""),
@@ -169,7 +169,7 @@ def main():
                     co_dt = g["check_out_dt"].max()
                     
                     if ref not in bookings_state:
-                        bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}}
+                        bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}, "timestamp": datetime.utcnow().isoformat()}
 
                     fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
                     lname = str(first.get("Guest last name", "")).strip().replace("nan", "")
@@ -194,13 +194,26 @@ def main():
     for ref, state in bookings_state.items():
         core = state["core"]
         
-        if not core.get("check_out") or not core.get("check_in"): continue
+        co_str = core.get("check_out", "")
+        ci_str = core.get("check_in", "")
+        co_dt = pd.to_datetime(co_str, errors="coerce")
+        ci_dt = pd.to_datetime(ci_str, errors="coerce")
         
-        co_dt = pd.to_datetime(core["check_out"], errors="coerce")
-        ci_dt = pd.to_datetime(core["check_in"], errors="coerce")
-        
+        # --- HISTORICAL BOOKING HANDLER ---
+        # If the booking is in the past, print it, save it, and skip API calls
         if pd.isna(co_dt) or pd.isna(ci_dt) or co_dt.date() < today_date:
-            continue  # Skip expired stays
+            print(f"⏳ Skipping {ref} ({core.get('guest_name')}): Checkout date ({co_str}) has passed.")
+            
+            # CRITICAL FIX: Ensure we write historical lock rows back to the file
+            for ltype, l_data in state["locks"].items():
+                if l_data.get("code_created"): # only save if it actually had data
+                    row_dict = {"timestamp": state.get("timestamp", datetime.utcnow().isoformat()), "reservation_code": ref, "lock_type": ltype}
+                    row_dict.update(core)
+                    row_dict.update(l_data)
+                    row_dict.update(state.get("stripe", {}))
+                    final_log_rows.append(row_dict)
+            continue
+        # ----------------------------------
 
         location = core["property_location"]
         room_name = core["door_number"]
@@ -301,7 +314,7 @@ def main():
 
             # Append the completed row object to our final output list
             final_row = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": state.get("timestamp", datetime.utcnow().isoformat()),
                 "reservation_code": ref,
                 "lock_type": ltype
             }
