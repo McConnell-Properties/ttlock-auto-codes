@@ -35,6 +35,8 @@ LOG_FIELDNAMES = [
     "ttlock_response",
     "start_ms",
     "end_ms",
+    "ttlock_start",    # Human-readable comparison field
+    "ttlock_end",      # Human-readable comparison field
     "stripe_session_id",
     "stripe_payment_url",
     "stripe_status",
@@ -63,7 +65,7 @@ def clean_date(val):
         return ""
 
 # -----------------------------
-# MAIN PIPELINE ECOSYSTEM
+# CORE PIPELINE LOGIC
 # -----------------------------
 def main():
     print("=== Unified Reservation Status Pipeline Start ===")
@@ -98,8 +100,6 @@ def main():
                 
                 ref = find_field(row_dict, ["reservation_code", "Booking reference", "booking_reference"])
                 if not ref: continue
-
-                ltype = find_field(row_dict, ["lock_type"]) or "room"
                 
                 if ref not in bookings_state:
                     bookings_state[ref] = {"core": {}, "locks": {}, "stripe": {}, "timestamp": row_dict.get("timestamp", datetime.utcnow().isoformat())}
@@ -108,19 +108,29 @@ def main():
                 ci = clean_date(find_field(row_dict, ["check_in", "Check in date", "Check-in date"]))
                 co = clean_date(find_field(row_dict, ["check_out", "Check out date", "Check-out date"]))
                 
-                # Reverse-engineer timestamps from milliseconds if text dates are blank
-                start_ms_val = row_dict.get("start_ms", "")
-                end_ms_val = row_dict.get("end_ms", "")
-                if not ci and start_ms_val:
+                # SAFEGUARD FIX: Calculate expected timestamps to patch legacy sheets missing start_ms/end_ms
+                calc_start_ms = ""
+                calc_end_ms = ""
+                calc_t_start = ""
+                calc_t_end = ""
+                if ci and co:
                     try:
-                        ms = int(float(start_ms_val))
-                        ci = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
+                        c_dt = pd.to_datetime(ci)
+                        o_dt = pd.to_datetime(co)
+                        start_dt = datetime.combine(c_dt.date(), time(15, 0), tzinfo=uk_tz)
+                        calc_start_ms = str(int(start_dt.timestamp() * 1000))
+                        calc_t_start = start_dt.strftime("%Y-%m-%d %H:%M %Z")
+                        
+                        end_dt = datetime.combine(o_dt.date(), time(11, 0), tzinfo=uk_tz)
+                        calc_end_ms = str(int(end_dt.timestamp() * 1000))
+                        calc_t_end = end_dt.strftime("%Y-%m-%d %H:%M %Z")
                     except: pass
-                if not co and end_ms_val:
-                    try:
-                        ms = int(float(end_ms_val))
-                        co = datetime.fromtimestamp(ms / 1000, tz=uk_tz).strftime("%Y-%m-%d")
-                    except: pass
+
+                # Use real ms/text if they exist, otherwise inject calculated values so they bypass API triggers
+                start_ms_val = str(row_dict.get("start_ms", "")).strip() or calc_start_ms
+                end_ms_val = str(row_dict.get("end_ms", "")).strip() or calc_end_ms
+                t_start_val = str(row_dict.get("ttlock_start", "")).strip() or calc_t_start
+                t_end_val = str(row_dict.get("ttlock_end", "")).strip() or calc_t_end
 
                 # Reconstruct full guest name
                 gname = find_field(row_dict, ["guest_name", "Guest Name"])
@@ -138,16 +148,42 @@ def main():
                     "check_out": co
                 }
                 
-                # Retain Lock Tracking Codes
-                if find_field(row_dict, ["code_created"]):
-                    bookings_state[ref]["locks"][ltype] = {
-                        "code_created": row_dict.get("code_created", "no"),
-                        "ttlock_response": row_dict.get("ttlock_response", ""),
-                        "start_ms": row_dict.get("start_ms", ""),
-                        "end_ms": row_dict.get("end_ms", "")
-                    }
+                # --- LEGACY LOCK COMPATIBILITY TRANSLATOR ---
+                ltype = find_field(row_dict, ["lock_type"])
                 
-                # Load Stripe Details safely (Skip general 'status' column to avoid booking metadata conflict)
+                # If we are reading a legacy wide-row format
+                if not ltype:
+                    fd_set = str(row_dict.get("front_door_lock_set", "")).strip().lower() == "true"
+                    room_set = str(row_dict.get("room_lock_set", "")).strip().lower() == "true"
+                    
+                    bookings_state[ref]["locks"]["front_door"] = {
+                        "code_created": "yes" if fd_set else "no",
+                        "ttlock_response": "Legacy log preserved",
+                        "start_ms": start_ms_val,
+                        "end_ms": end_ms_val,
+                        "ttlock_start": t_start_val,
+                        "ttlock_end": t_end_val
+                    }
+                    bookings_state[ref]["locks"]["room"] = {
+                        "code_created": "yes" if room_set else "no",
+                        "ttlock_response": "Legacy log preserved",
+                        "start_ms": start_ms_val,
+                        "end_ms": end_ms_val,
+                        "ttlock_start": t_start_val,
+                        "ttlock_end": t_end_val
+                    }
+                else:
+                    # Reading the new unified long-row format
+                    if find_field(row_dict, ["code_created"]):
+                        bookings_state[ref]["locks"][ltype] = {
+                            "code_created": row_dict.get("code_created", "no"),
+                            "ttlock_response": row_dict.get("ttlock_response", ""),
+                            "start_ms": start_ms_val, "end_ms": end_ms_val,
+                            "ttlock_start": t_start_val, "ttlock_end": t_end_val
+                        }
+                # ----------------------------------------------
+                
+                # Load Stripe Details safely
                 s_id = find_field(row_dict, ["stripe_session_id", "session_id"])
                 if s_id:
                     bookings_state[ref]["stripe"] = {
@@ -243,7 +279,7 @@ def main():
             
             lock_types_to_save = list(state["locks"].keys()) if state["locks"] else ["front_door", "room"]
             for ltype in lock_types_to_save:
-                l_data = state["locks"].get(ltype, {"code_created": "yes", "ttlock_response": "Historical log preserved", "start_ms": "", "end_ms": ""})
+                l_data = state["locks"].get(ltype, {"code_created": "yes", "ttlock_response": "Historical log preserved", "start_ms": "", "end_ms": "", "ttlock_start": "", "ttlock_end": ""})
                 row_dict = {"timestamp": state.get("timestamp", datetime.utcnow().isoformat()), "reservation_code": ref, "lock_type": ltype}
                 row_dict.update(core)
                 row_dict.update(l_data)
@@ -306,6 +342,9 @@ def main():
         start_ms = int(start_dt.timestamp() * 1000)
         end_dt = datetime.combine(co_dt.date(), time(11, 0), tzinfo=uk_tz)
         end_ms = int(end_dt.timestamp() * 1000)
+        
+        t_start_str = start_dt.strftime("%Y-%m-%d %H:%M %Z")
+        t_end_str = end_dt.strftime("%Y-%m-%d %H:%M %Z")
 
         for ltype in ["front_door", "room"]:
             lock_id = None
@@ -314,29 +353,29 @@ def main():
 
             if not lock_id: continue
 
-            l_data = state["locks"].get(ltype, {"code_created": "no", "ttlock_response": "", "start_ms": "", "end_ms": ""})
+            l_data = state["locks"].get(ltype, {"code_created": "no", "ttlock_response": "", "start_ms": "", "end_ms": "", "ttlock_start": "", "ttlock_end": ""})
             
             if l_data["code_created"] == "yes":
                 if str(l_data["start_ms"]) == str(start_ms) and str(l_data["end_ms"]) == str(end_ms):
-                    print(f"   ✅ {ltype} code matches calendar window.")
+                    print(f"   ✅ {ltype} code matches calendar window. Bypassing API.")
                 else:
                     pwd_id = None
                     try: pwd_id = ast.literal_eval(l_data["ttlock_response"]).get("keyboardPwdId")
                     except: pass
                     
                     if pwd_id:
-                        print(f"   🔄 Dates changed. Modifying {ltype} window...")
+                        print(f"   🔄 Dates changed. Modifying {ltype} window via API...")
                         success, resp = tt.change_lock_code_period(lock_id, pwd_id, start_ms, end_ms)
-                        l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms})
+                        l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms, "ttlock_start": t_start_str, "ttlock_end": t_end_str})
                     else:
                         l_data["code_created"] = "no"
 
             if l_data["code_created"] != "yes":
-                print(f"   🚪 Generating {ltype} code...")
+                print(f"   🚪 Generating {ltype} code via API...")
                 desc = "Front Door" if ltype == "front_door" else room_name
                 success, resp = tt.create_lock_code_simple(lock_id, code, guest_name, start_ms, end_ms, f"{desc} ({location})", ref)
                 if not success and isinstance(resp, dict) and resp.get("errcode") == -3007: success = True
-                l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms})
+                l_data.update({"code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms, "ttlock_start": t_start_str, "ttlock_end": t_end_str})
 
             # Format finalized dictionary fields
             final_row = {"timestamp": state.get("timestamp", datetime.utcnow().isoformat()), "reservation_code": ref, "lock_type": ltype}
