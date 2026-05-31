@@ -76,7 +76,7 @@ def main():
 
 
 # ==============================================================================
-# AUTOMATIC CRM DASHBOARD SYNC SYSTEM (FORMULA-FREE FILTERING)
+# AUTOMATIC CRM DASHBOARD SYNC SYSTEM (SMART UPDATE ENGINE)
 # ==============================================================================
 
 def clean_crm_date(date_str):
@@ -89,10 +89,9 @@ def clean_crm_int(val):
     except: return 0
 
 def sync_crm_dashboard_live(client):
-    print("🚀 Starting CRM Dashboard live processing...")
+    print("🚀 Starting CRM Dashboard Smart Update processing...")
     
     try:
-        # Open using the shared project ID
         spreadsheet = client.open_by_key(SPREADSHEET_ID)
         crm_sheet = spreadsheet.worksheet("CRM Dashboard")
         raw_res_sheet = spreadsheet.worksheet("Raw_Reservations")
@@ -101,15 +100,27 @@ def sync_crm_dashboard_live(client):
         print(f"❌ Sheet selection error: {e}. Ensure tab names match exactly.")
         return
 
-    # Fetch records safely
-    crm_records = crm_sheet.get_all_records()
+    # Fetch raw data records
     raw_res_records = raw_res_sheet.get_all_records()
     raw_stripe_records = raw_stripe_sheet.get_all_records()
 
-    # Track what's already on the dashboard to prevent duplicates
-    existing_codes = set(str(row.get("reservation_code", "")).strip() for row in crm_records if row.get("reservation_code"))
+    # Fetch the CRM as a 2D grid of strings to easily pinpoint row numbers
+    crm_grid = crm_sheet.get_all_values()
 
-    # Map Stripe updates
+    # Map existing CRM rows by reservation_code (Column A)
+    # This tracks the physical row number on the spreadsheet
+    crm_row_map = {}
+    for idx, row in enumerate(crm_grid):
+        if idx == 0: continue  # Skip the header row
+        if row:  # Ensure the row isn't completely blank
+            res_code = str(row[0]).strip()
+            if res_code:
+                crm_row_map[res_code] = {
+                    "sheet_row": idx + 1,        # 1-based index for Google Sheets
+                    "current_data": row[:34]     # Columns A through AH
+                }
+
+    # Map Stripe updates for quick lookup
     stripe_map = {}
     for row in raw_stripe_records:
         res_code = str(row.get("reservation_code", "")).strip()
@@ -120,60 +131,90 @@ def sync_crm_dashboard_live(client):
             }
 
     new_crm_rows = []
+    updates_batch = []
 
     # Map rows matching your exact CRM schema structure
     for row in raw_res_records:
         res_code = str(row.get("reservation_code", "")).strip()
-        if not res_code or res_code in existing_codes:
+        if not res_code:
             continue
 
         stripe_data = stripe_map.get(res_code, {"url": "No Link", "status": "No Status"})
 
+        # Build the fresh 34-column array
         crm_row = [
-            res_code,                                          # Column A: reservation_code
-            row.get("Booking reference", ""),                  # Column B
-            row.get("booked", ""),                             # Column C
-            row.get("property_name", ""),                      # Column D
-            row.get("channel_name", ""),                       # Column E
-            row.get("promotion_code", ""),                     # Column F
-            row.get("guest_first_name", ""),                   # Column G
-            row.get("guest_last_name", ""),                    # Column H
-            row.get("guest_email", ""),                        # Column I
-            row.get("guest_phone_number", ""),                 # Column J
-            row.get("guest_organisation", ""),                 # Column K
-            row.get("guest_address", ""),                      # Column L
-            row.get("guest_address2", ""),                     # Column M
-            row.get("guest_city", ""),                         # Column N
-            row.get("guest_state", ""),                        # Column O
-            row.get("guest_country", ""),                      # Column P
-            row.get("guest_post_code", ""),                    # Column Q
-            clean_crm_date(row.get("Check in date", "")),      # Column R: Clean filterable date
-            clean_crm_date(row.get("Check out date", "")),     # Column S: Clean filterable date
-            clean_crm_int(row.get("length_of_stay_(nights)", 0)), # Column T: Sortable true number
-            row.get("arrival_time", ""),                       # Column U
-            row.get("guest_comments", ""),                     # Column V
-            row.get("notes", ""),                              # Column W
-            row.get("requested_newsletter", ""),               # Column X
-            row.get("status", ""),                             # Column Y
-            row.get("cancelled_at", ""),                       # Column Z
-            row.get("room_types", ""),                         # Column AA
-            clean_crm_int(row.get("number_of_adults", 0)),     # Column AB: Sortable true number
-            clean_crm_int(row.get("number_of_children", 0)),   # Column AC: Sortable true number
-            clean_crm_int(row.get("number_of_infants", 0)),    # Column AD: Sortable true number
-            row.get("front_door_lock_set", ""),                # Column AE
-            row.get("room_lock_set", ""),                      # Column AF
-            stripe_data["url"],                                # Column AG: stripe_payment_url
-            stripe_data["status"]                              # Column AH: stripe_status
+            res_code,                                          # A: reservation_code
+            row.get("Booking reference", ""),                  # B
+            row.get("booked", ""),                             # C
+            row.get("property_name", ""),                      # D
+            row.get("channel_name", ""),                       # E
+            row.get("promotion_code", ""),                     # F
+            row.get("guest_first_name", ""),                   # G
+            row.get("guest_last_name", ""),                    # H
+            row.get("guest_email", ""),                        # I
+            row.get("guest_phone_number", ""),                 # J
+            row.get("guest_organisation", ""),                 # K
+            row.get("guest_address", ""),                      # L
+            row.get("guest_address2", ""),                     # M
+            row.get("guest_city", ""),                         # N
+            row.get("guest_state", ""),                        # O
+            row.get("guest_country", ""),                      # P
+            row.get("guest_post_code", ""),                    # Q
+            clean_crm_date(row.get("Check in date", "")),      # R
+            clean_crm_date(row.get("Check out date", "")),     # S
+            clean_crm_int(row.get("length_of_stay_(nights)", 0)), # T
+            row.get("arrival_time", ""),                       # U
+            row.get("guest_comments", ""),                     # V
+            row.get("notes", ""),                              # W
+            row.get("requested_newsletter", ""),               # X
+            row.get("status", ""),                             # Y
+            row.get("cancelled_at", ""),                       # Z
+            row.get("room_types", ""),                         # AA
+            clean_crm_int(row.get("number_of_adults", 0)),     # AB
+            clean_crm_int(row.get("number_of_children", 0)),   # AC
+            clean_crm_int(row.get("number_of_infants", 0)),    # AD
+            row.get("front_door_lock_set", ""),                # AE
+            row.get("room_lock_set", ""),                      # AF
+            stripe_data["url"],                                # AG
+            stripe_data["status"]                              # AH
         ]
-        new_crm_rows.append(crm_row)
 
-    if new_crm_rows:
-        print(f"🚀 Sync Engine: Appending {len(new_crm_rows)} new historical records directly as values...")
-        crm_sheet.append_rows(new_crm_rows, value_input_option="USER_ENTERED")
-        print("✅ CRM Synchronization successfully closed.")
+        if res_code in crm_row_map:
+            # The booking exists! Let's check if any data has changed.
+            sheet_row_num = crm_row_map[res_code]["sheet_row"]
+            current_values = crm_row_map[res_code]["current_data"]
+
+            # Ensure the current_values array is exactly 34 columns long
+            current_values += [""] * (34 - len(current_values))
+
+            # Convert our fresh data to strings to safely compare against the sheet's raw text
+            crm_row_str = [str(x) for x in crm_row]
+
+            # If the data has been modified, queue a targeted overwrite for Columns A -> AH only
+            if current_values != crm_row_str:
+                updates_batch.append({
+                    'range': f'A{sheet_row_num}:AH{sheet_row_num}',
+                    'values': [crm_row]
+                })
+        else:
+            # The booking is brand new! Add it to the append list.
+            new_crm_rows.append(crm_row)
+
+    # Execute targeted overwrites for modified existing rows
+    if updates_batch:
+        print(f"🔄 Sync Engine: Updating {len(updates_batch)} modified existing records...")
+        crm_sheet.batch_update(updates_batch, value_input_option="USER_ENTERED")
     else:
-        print("ℹ️ Sync Engine: Dashboard is already fully up to date.")
+        print("ℹ️ Sync Engine: No existing records required updating.")
 
+    # Execute appends for brand-new rows
+    if new_crm_rows:
+        print(f"🚀 Sync Engine: Appending {len(new_crm_rows)} brand new records...")
+        crm_sheet.append_rows(new_crm_rows, value_input_option="USER_ENTERED")
+    else:
+        print("ℹ️ Sync Engine: No new records to append.")
+
+    print("✅ CRM Synchronization successfully closed.")
 
 if __name__ == "__main__":
     main()
