@@ -187,4 +187,25 @@ timestamp,reservation_code,guest_name,property_location,door_number,lock_type,co
 2026-05-30T16:14:11.510,EXP-2471968871,Antonio Tufo,Valnay Stays,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1780236000000,1780826400000
 2026-05-30T16:14:16.060,EXP-2471968871,Antonio Tufo,Valnay Stays,Room 1,room,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1780236000000,1780826400000
 2026-05-30T16:14:20.309,EXP-2471990851,Irma Salazar,Valnay Stays,Front Door,front_door,yes,"{'errcode': -3007, 'errmsg': 'The same passcode\xa0already exists. Please use another one.', 'description': '已存在相同的密码，请更换。'}",1781013600000,1781344800000
-2026-05-30T16:14:34.118,EXP-2471990851,Irma Salazar,Valnay Stays,Room 5,room,no,Failed after 3 retries,1781013600000,1781344800000
+2026-05-31T15:39:10.845,BDC-5134712182,ROHAN Metric,Streatham Rooms,Front Door,front_door,yes,{'keyboardPwdId': 80617684},1780236000000,1780308000000
+2026-05-31T15:39:13.052,BDC-5134712182,ROHAN Metric,Streatham Rooms,Room 2,room,yes,{'keyboardPwdId': 80617702},1780236000000,1780308000000
+2026-05-31T15:39:14.442,BDC-5134792531,Behruz Najmidinov,Streatham Rooms,Front Door,front_door,yes,{'keyboardPwdId': 80617712},1780236000000,1780653600000
+2026-05-31T15:39:19.312,BDC-5134792531,Behruz Najmidinov,Streatham Rooms,Room 10,room,yes,{'keyboardPwdId': 80617726},1780236000000,1780653600000
+2026-05-31T15:39:32.642,BDC-5240702320,Anthony Blake,Tooting Stays,Front Door,front_door,no,Failed after 3 retries,1780236000000,1780826400000
+2026-05-31T15:39:34.052,BDC-5240702320,Anthony Blake,Tooting Stays,Room 2,room,no,Failed after 3 retries,1780236000000,1780826400000
+2026-05-31T15:39:35.606,BDC-5358478408,Tufo Antonio,Tooting Stays,Front Door,front_door,no,Failed after 3 retries,1780840800000,1781431200000
+2026-05-31T15:39:37.500,BDC-5358478408,Tufo Antonio,Tooting Stays,Room 1,room,yes,{'keyboardPwdId': 80617772},1780840800000,1781431200000
+2026-05-31T15:39:40.888,BDC-6185364028,Stuart Mo,Streatham Rooms,Front Door,front_door,yes,{'keyboardPwdId': 80617782},1780668000000,1780740000000
+2026-05-31T15:39:42.754,BDC-6185364028,Stuart Mo,Streatham Rooms,Room 8,room,yes,{'keyboardPwdId': 80617786},1780668000000,1780740000000
+2026-05-31T15:39:44.538,BDC-6319703877,Gorey Connor,Tooting Stays,Front Door,front_door,yes,{'keyboardPwdId': 80617796},1780322400000,1782554400000
+2026-05-31T15:39:46.551,BDC-6319703877,Gorey Connor,Tooting Stays,Room 3,room,yes,{'keyboardPwdId': 80617800},1780322400000,1782554400000
+2026-05-31T15:39:59.915,BDC-6355049742,Miłosz Miśta,Tooting Stays,Front Door,front_door,no,Failed after 3 retries,1780581600000,1781517600000
+2026-05-31T15:40:01.313,BDC-6355049742,Miłosz Miśta,Tooting Stays,Room 5,room,no,Failed after 3 retries,1780581600000,1781517600000
+2026-05-31T15:40:02.680,BDC-6665519059,Davies Joshua,Tooting Stays,Front Door,front_door,no,Failed after 3 retries,1780322400000,1780567200000
+2026-05-31T15:40:04.328,BDC-6665519059,Davies Joshua,Tooting Stays,Room 5,room,no,Failed after 3 retries,1780322400000,1780567200000
+2026-05-31T15:40:05.633,BDC-6698486623,JESUS LOPEZ RAMIREZ,Tooting Stays,Front Door,front_door,no,Failed after 3 retries,1781704800000,1781949600000
+2026-05-31T15:40:18.813,EXP-2471990851,Irma Salazar,Valnay Stays,Room 5,room,no,Failed after 3 retries,1781013600000,1781344800000
+2026-05-31T15:40:21.230,EXP-2472975308,Jose Javier Espada jara,Streatham Rooms,Front Door,front_door,yes,{'keyboardPwdId': 80617912},1782482400000,1782727200000
+2026-05-31T15:40:22.956,EXP-2472975308,Jose Javier Espada jara,Streatham Rooms,Room 10,room,yes,{'keyboardPwdId': 80617922},1782482400000,1782727200000
+2026-05-31T15:40:24.314,EXP-2473121964,BENJAMIN GOBEDE,Valnay Stays,Front Door,front_door,no,Failed after 3 retries,1780322400000,1780394400000
+2026-05-31T15:40:32.585,EXP-2473121964,BENJAMIN GOBEDE,Valnay Stays,Room 4,room,yes,{'keyboardPwdId': 80617958},1780322400000,1780394400000
