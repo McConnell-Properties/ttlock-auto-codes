@@ -35,18 +35,9 @@ jobs:
           pip install pandas requests stripe gspread oauth2client
 
       # ---------------------------
-      # STEP 1 — CHECK CURRENT STRIPE STATUSES
+      # STEP 1 — RUN UNIFIED RESERVATION PIPELINE
       # ---------------------------
-      # Checks if any active links have been paid by guests and updates logs first
-      - name: Check Stripe Payment Statuses
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        run: python scripts/check_stripe_status.py
-
-      # ---------------------------
-      # STEP 2 — RUN UNIFIED RESERVATION PIPELINE
-      # ---------------------------
-      # Executes lock code rules, link checking, and expiration overrides at once
+      # Executes stripe verification, lock code rules, link generation, and expiration overrides at once
       - name: Run Unified Reservation Status Pipeline
         env:
           TTLOCK_CLIENT_ID: ${{ secrets.TTLOCK_CLIENT_ID }}
@@ -55,7 +46,7 @@ jobs:
         run: python scripts/run_reservation_pipeline.py
 
       # ---------------------------
-      # STEP 3 — PUSH UNIFIED DATA TO GOOGLE SHEETS
+      # STEP 2 — PUSH UNIFIED DATA TO GOOGLE SHEETS
       # ---------------------------
       - name: Export Data to Google Sheets
         env:
@@ -64,7 +55,7 @@ jobs:
         run: python scripts/push_to_sheets.py
 
       # ---------------------------
-      # STEP 4 — AUTOMATIC CLEANUP (DROPZONE WIPE)
+      # STEP 3 — AUTOMATIC CLEANUP (DROPZONE WIPE)
       # ---------------------------
       - name: Wipe Raw Input Data
         run: |
