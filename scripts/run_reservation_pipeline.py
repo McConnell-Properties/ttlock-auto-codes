@@ -21,13 +21,15 @@ CURRENCY = "gbp"
 DATA_DIR = "automation-data"
 LOG_PATH = "automation-data/reservation_status.csv"
 
-# Unified Headers tracking both Lock State and Stripe Link Metrics
 LOG_FIELDNAMES = [
     "timestamp",
     "reservation_code",
     "guest_name",
+    "guest_email",
     "property_location",
     "door_number",
+    "check_in",
+    "check_out",
     "lock_type",
     "code_created",
     "ttlock_response",
@@ -40,249 +42,195 @@ LOG_FIELDNAMES = [
 ]
 
 # -----------------------------
-# HELPERS & LOG PARSERS
+# PHASE 1: INGESTION & STATE SYNC
 # -----------------------------
-def load_existing_log_data():
+def sync_and_load_master_state():
     """
-    Reads the single source of truth log file to extract:
-    1. Completed locks mapped by reservation and lock type.
-    2. Active, unexpired, or already paid Stripe links.
+    Step 1 of the pipeline: Reads existing tracking logs and merges new dropzone 
+    CSV files to build a single, perfectly updated master record array before 
+    any API activities run.
     """
-    completed_locks = {}
-    active_stripe_links = {}
+    today = pd.Timestamp(date.today())
+    master_records = {}
 
-    if not os.path.exists(LOG_PATH):
-        print("ℹ️ No reservation_status.csv found yet – treating this as a first run.")
-        return completed_locks, active_stripe_links
-
-    try:
-        df = pd.read_csv(LOG_PATH, dtype=str)
-        if df.empty:
-            return completed_locks, active_stripe_links
-        
-        # SAFE GUARD: Dynamically ensure ALL standard formatting columns exist 
-        # to avoid KeyErrors if reading a legacy or custom tracking file
-        for col in LOG_FIELDNAMES:
-            if col not in df.columns:
-                df[col] = ""
-
-        # --- 1. Parse Active Stripe Links ---
-        df_stripe = df.dropna(subset=["reservation_code"]).copy()
-        df_stripe = df_stripe[df_stripe["stripe_timestamp"] != ""]
-        
-        if not df_stripe.empty:
-            df_stripe["stripe_ts_dt"] = pd.to_datetime(df_stripe["stripe_timestamp"], errors="coerce")
-            # Sort newest first so we get the latest generated link per booking reference
-            df_stripe = df_stripe.sort_values(by="stripe_ts_dt", ascending=False)
-            
-            for _, row in df_stripe.drop_duplicates(subset=["reservation_code"], keep="first").iterrows():
-                ref = row["reservation_code"]
-                ts_dt = row["stripe_ts_dt"]
-                status = str(row.get("stripe_status", "")).lower()
-                
-                is_expired = pd.notna(ts_dt) and (datetime.utcnow() - ts_dt.to_pydatetime() > timedelta(hours=24))
-                is_paid = any(x in status for x in ["paid", "succeed", "captured"])
-                
-                # A link is active if it's less than 24 hours old OR already paid/settled
-                if (not is_expired) or is_paid:
-                    active_stripe_links[ref] = {
-                        "session_id": row.get("stripe_session_id", ""),
-                        "payment_url": row.get("stripe_payment_url", ""),
-                        "status": row.get("stripe_status", "link_generated"),
-                        "timestamp": row["stripe_timestamp"]
-                    }
-
-        # --- 2. Parse Completed TTLock Configurations ---
-        df["timestamp_dt"] = pd.to_datetime(df["timestamp"], errors='coerce')
-        success_locks = df[df["code_created"] == "yes"].sort_values(by="timestamp_dt", ascending=False)
-        
-        for _, row in success_locks.drop_duplicates(subset=["reservation_code", "lock_type"], keep="first").iterrows():
-            ref = row["reservation_code"]
-            lock_type = row["lock_type"]
-            
-            pwd_id = None
-            try:
-                resp_dict = ast.literal_eval(row["ttlock_response"])
-                pwd_id = resp_dict.get("keyboardPwdId")
-            except:
-                pass
-                
-            start_ms = row["start_ms"]
-            end_ms = row["end_ms"]
-            try: start_ms = int(float(start_ms)) if pd.notna(start_ms) and str(start_ms).strip() else None
-            except: start_ms = None
-            try: end_ms = int(float(end_ms)) if pd.notna(end_ms) and str(end_ms).strip() else None
-            except: end_ms = None
-            
-            if ref not in completed_locks:
-                completed_locks[ref] = {}
-                
-            completed_locks[ref][lock_type] = {
-                "keyboardPwdId": pwd_id,
-                "start_ms": start_ms,
-                "end_ms": end_ms,
-                "raw_response": row["ttlock_response"]
-            }
-            
-    except Exception as e:
-        print(f"⚠️ Error parsing unified tracking logs: {e}")
-
-    print(f"✔ Loaded {len(completed_locks)} lock maps and {len(active_stripe_links)} active payment tokens.")
-    return completed_locks, active_stripe_links
-
-
-def aggregate_bookings():
-    """Load all CSVs in dropzone folders, apply date filters, merge duplicate rows."""
-    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
-
-    if not all_csvs:
-        print(f"⚠️ No reservation CSVs found in {DATA_DIR}/inputs/ – aborting pipeline execution step.")
-        return []
-
-    df_list = []
-    for file in all_csvs:
+    # --- 1. Load Existing Logs ---
+    if os.path.exists(LOG_PATH):
         try:
-            df_list.append(pd.read_csv(file, dtype=str))
+            df_old = pd.read_csv(LOG_PATH, dtype=str)
+            for col in LOG_FIELDNAMES:
+                if col not in df_old.columns:
+                    df_old[col] = ""
+            
+            # Sort chronologically so the newest historical logs settle on top
+            df_old["tmp_ts"] = pd.to_datetime(df_old["timestamp"], errors="coerce")
+            df_old = df_old.sort_values(by="tmp_ts", ascending=True)
+
+            for _, row in df_old.dropna(subset=["reservation_code", "lock_type"]).iterrows():
+                ref = row["reservation_code"]
+                ltype = row["lock_type"]
+                
+                if ref not in master_records:
+                    master_records[ref] = {}
+                
+                master_records[ref][ltype] = row.to_dict()
         except Exception as e:
-            print(f"⚠️ Could not read {file}: {e}")
+            print(f"⚠️ Warning reading baseline history file: {e}")
 
-    if not df_list:
-        return []
-
-    df = pd.concat(df_list, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-
-    if "Booking reference" not in df.columns:
-        print("⚠️ 'Booking reference' column not found in uploaded CSVs.")
-        return []
-
-    df["reservation_code"] = df["Booking reference"].fillna("").astype(str).str.strip()
-    df = df[df["reservation_code"] != ""].copy()
-
-    if df.empty: return []
-
-    df["check_in"] = pd.to_datetime(df["Check in date"], errors="coerce")
-    df["check_out"] = pd.to_datetime(df["Check out date"], errors="coerce")
-    df = df.dropna(subset=["check_in", "check_out"])
-
-    today = date.today()
-    horizon = today + timedelta(days=30)
-
-    mask = (df["check_out"].dt.date >= today) & (df["check_in"].dt.date <= horizon)
-    df = df[mask].copy()
-
-    if df.empty: return []
-
-    bookings = []
-    for ref, g in df.groupby("reservation_code"):
-        first = g.iloc[0]
-        location = first.get("Property name", "") or ""
-        room = first.get("Rooms", "") or ""
+    # --- 2. Ingest New Dropzone Files ---
+    all_csvs = glob.glob(f"{DATA_DIR}/inputs/*.csv")
+    if all_csvs:
+        print(f"📥 Found raw data in dropzone. Parsing uploads for profile updates...")
+        df_list = []
+        for file in all_csvs:
+            try:
+                df_list.append(pd.read_csv(file, dtype=str))
+            except:
+                continue
         
-        fname = str(first.get("Guest first name", "")).strip()
-        if fname.lower() == "nan": fname = ""
-        lname = str(first.get("Guest last name", "")).strip()
-        if lname.lower() == "nan": lname = ""
-        guest = f"{fname} {lname}".strip()
+        if df_list:
+            df_new = pd.concat(df_list, ignore_index=True)
+            df_new.columns = [c.strip() for c in df_new.columns]
+            
+            if "Booking reference" in df_new.columns:
+                df_new["reservation_code"] = df_new["Booking reference"].fillna("").astype(str).str.strip()
+                df_new = df_new[df_new["reservation_code"] != ""].copy()
+                df_new["check_in_dt"] = pd.to_datetime(df_new["Check in date"], errors="coerce")
+                df_new["check_out_dt"] = pd.to_datetime(df_new["Check out date"], errors="coerce")
+                df_new = df_new.dropna(subset=["check_in_dt", "check_out_dt"])
 
-        email = str(first.get("Guest email", "")).strip()
-        if email.lower() == "nan" or not email: email = None
+                # Group to isolate unique reservation changes
+                for ref, g in df_new.groupby("reservation_code"):
+                    first = g.iloc[0]
+                    co_dt = g["check_out_dt"].max()
+                    
+                    # Skip historical files that already checked out
+                    if co_dt.date() < date.today():
+                        continue
 
-        check_in = g["check_in"].min()
-        check_out = g["check_out"].max()
+                    # Extract the clean updated metadata metrics
+                    fname = str(first.get("Guest first name", "")).strip().replace("nan", "")
+                    lname = str(first.get("Guest last name", "")).strip().replace("nan", "")
+                    guest = f"{fname} {lname}".strip()
+                    email = str(first.get("Guest email", "")).strip()
+                    if email.lower() == "nan" or not email: email = ""
+                    
+                    location = first.get("Property name", "") or ""
+                    room = first.get("Rooms", "") or ""
+                    ci_str = g["check_in_dt"].min().strftime("%Y-%m-%d")
+                    co_str = co_dt.strftime("%Y-%m-%d")
 
-        digits = re.sub(r"\D", "", ref)
-        code = digits[-4:] if len(digits) >= 4 else None
+                    # Apply updates down both possible lock tracks (front_door and room)
+                    for ltype in ["front_door", "room"]:
+                        if ref not in master_records:
+                            master_records[ref] = {}
+                        
+                        # If it's a brand new booking, initialize an empty dictionary row layout
+                        if ltype not in master_records[ref]:
+                            master_records[ref][ltype] = {col: "" for col in LOG_FIELDNAMES}
+                            master_records[ref][ltype]["reservation_code"] = ref
+                            master_records[ref][ltype]["lock_type"] = ltype
+                            master_records[ref][ltype]["code_created"] = "no"
 
-        bookings.append({
-            "reservation_code": ref,
-            "guest_name": guest,
-            "guest_email": email,
-            "property_location": location,
-            "door_number": room,
-            "check_in": check_in,
-            "check_out": check_out,
-            "code": code,
-        })
+                        # Overwrite core reservation data with the fresh dropzone inputs
+                        master_records[ref][ltype].update({
+                            "guest_name": guest,
+                            "guest_email": email if email else master_records[ref][ltype].get("guest_email", ""),
+                            "property_location": location,
+                            "door_number": room,
+                            "check_in": ci_str,
+                            "check_out": co_str
+                        })
+            else:
+                print("⚠️ 'Booking reference' header missing in dropzone files.")
 
-    print(f"✔ Aggregated to {len(bookings)} unique reservations from input dropzone.")
-    return bookings
+    # --- 3. Filter out expired historical entries ---
+    active_state_matrix = []
+    for ref, tracks in master_records.items():
+        for ltype, record in tracks.items():
+            co_str = record.get("check_out", "")
+            if co_str:
+                co_dt = pd.to_datetime(co_str, errors="coerce")
+                if pd.notna(co_dt) and co_dt.date() >= date.today():
+                    active_state_matrix.append(record)
+
+    print(f"✔ State Synchronization Complete. Tracked active rows: {len(active_state_matrix)}")
+    return active_state_matrix
 
 
 # -----------------------------
-# MAIN PIPELINE EXECUTION
+# PHASE 2: ACTIVITY EXECUTION
 # -----------------------------
 def main():
     print("=== Unified Reservation Status Pipeline Start ===")
     
-    # Initialize TTLock
+    # Authenticate Lock Core Ecosystem
     client_id = os.getenv("TTLOCK_CLIENT_ID")
     if not client_id:
         print("❌ TTLOCK_CLIENT_ID not set in environment – cannot proceed.")
         return
     tt.initialize_ttlock(client_id)
 
-    # Verify Stripe
     if not stripe.api_key:
         print("❌ STRIPE_SECRET_KEY not set in environment – cannot proceed.")
         return
 
-    # Load Single Source of Truth Arrays
-    completed_locks_map, active_stripe_map = load_existing_log_data()
-    bookings = aggregate_bookings()
+    # RUN PHASE 1: Load and Ingest state rows explicitly up front
+    active_rows = sync_and_load_master_state()
 
-    if not bookings:
-        print("ℹ️ No eligible bookings found in dropzone matching processing requirements.")
+    if not active_rows:
+        print("ℹ️ No active tracked reservations found to evaluate. Exiting pipeline.")
         return
 
-    log_rows = []
-    
-    for booking in bookings:
-        ref = booking["reservation_code"]
-        guest_name = booking["guest_name"]
-        email = booking["guest_email"]
-        location = booking["property_location"]
-        room_name = booking["door_number"]
-        code = booking["code"]
-        check_in = booking["check_in"]
-        check_out = booking["check_out"]
+    print("🚀 Evaluating required activities directly off the master state database...")
+    processed_log_rows = []
 
-        if not code: continue
-        if location not in tt.PROPERTIES: continue
-        prop_conf = tt.PROPERTIES[location]
-
-        # Time Adjustment Math (Europe/London Timezone Aware)
-        uk_tz = ZoneInfo("Europe/London")
-        start_dt = datetime.combine(check_in.date(), time(15, 0), tzinfo=uk_tz)
-        start_ms = int(start_dt.timestamp() * 1000)
-
-        end_dt = datetime.combine(check_out.date(), time(11, 0), tzinfo=uk_tz)
-        end_ms = int(end_dt.timestamp() * 1000)
+    for row in active_rows:
+        ref = row["reservation_code"]
+        guest_name = row["guest_name"]
+        email = row["guest_email"] if row["guest_email"] else None
+        location = row["property_location"]
+        room_name = row["door_number"]
+        ltype = row["lock_type"]
         
-        nights = (check_out - check_in).days
+        # Calculate trailing 4 digits from reservation string for lock passcodes
+        digits = re.sub(r"\D", "", ref)
+        code = digits[-4:] if len(digits) >= 4 else None
 
-        print(f"\n📋 Processing Booking: {ref} — Guest: {guest_name}")
-        print(f"   Property: {location}, Stay: {nights} Nights")
+        if not code or location not in tt.PROPERTIES:
+            processed_log_rows.append(row)
+            continue
 
-        # -------------------------------------------------------------
-        # STEP 1: EVALUATE STRIPE DEPOSIT LINK
-        # -------------------------------------------------------------
-        stripe_id = ""
-        stripe_url = ""
-        stripe_status = ""
-        stripe_ts = ""
-        new_stripe_generated = False
+        prop_conf = tt.PROPERTIES[location]
+        ci_dt = pd.to_datetime(row["check_in"])
+        co_dt = pd.to_datetime(row["check_out"])
+        nights = (co_dt - ci_dt).days
 
-        if ref in active_stripe_map:
-            # Active or fully paid link already exists—retrieve and reuse it
-            stripe_id = active_stripe_map[ref]["session_id"]
-            stripe_url = active_stripe_map[ref]["payment_url"]
-            stripe_status = active_stripe_map[ref]["status"]
-            stripe_ts = active_stripe_map[ref]["timestamp"]
-            print(f"   💳 Valid/Paid Stripe link detected in log file: {stripe_status}")
+        # Setup Time Adjustments (Europe/London Timezone Mapping)
+        uk_tz = ZoneInfo("Europe/London")
+        start_dt = datetime.combine(ci_dt.date(), time(15, 0), tzinfo=uk_tz)
+        start_ms = int(start_dt.timestamp() * 1000)
+        end_dt = datetime.combine(co_dt.date(), time(11, 0), tzinfo=uk_tz)
+        end_ms = int(end_dt.timestamp() * 1000)
+
+        row["timestamp"] = datetime.utcnow().isoformat()
+
+        # --- TASK A: MONITOR STRIPE ACCESS HOLD LINKS ---
+        stripe_ts_str = row.get("stripe_timestamp", "")
+        stripe_status_str = str(row.get("stripe_status", "")).lower()
+        
+        is_link_valid = False
+        if stripe_ts_str:
+            ts_dt = pd.to_datetime(stripe_ts_str, errors="coerce")
+            is_expired = pd.notna(ts_dt) and (datetime.utcnow() - ts_dt.to_pydatetime() > timedelta(hours=24))
+            is_paid = any(x in stripe_status_str for x in ["paid", "succeed", "captured"])
+            if (not is_expired) or is_paid:
+                is_link_valid = True
+
+        if is_link_valid:
+            # Re-use current valid token properties natively mapped on the row object
+            pass
         else:
-            # No active link exists (<24h old or paid), force immediate generation override
-            print(f"   💳 No active Stripe session found or link expired. Generating new checkout token...")
+            print(f"   💳 Stripe Link Needed for {ref} ({guest_name}). Requesting Checkout Session...")
             try:
                 session = stripe.checkout.Session.create(
                     payment_method_types=['card'],
@@ -302,151 +250,83 @@ def main():
                     payment_intent_data={'capture_method': 'manual'},
                     success_url='https://mcconnell-properties.com/', 
                     cancel_url='https://mcconnell-properties.com/',
-                    metadata={
-                        'reservation_code': ref,
-                        'guest_name': guest_name,
-                        'property': location
-                    }
+                    metadata={'reservation_code': ref, 'guest_name': guest_name, 'property': location}
                 )
-                stripe_id = session.id
-                stripe_url = session.url
-                stripe_status = "link_generated"
-                stripe_ts = datetime.utcnow().isoformat()
-                new_stripe_generated = True
-                print(f"   ✅ Stripe link generated: {stripe_url}")
+                row["stripe_session_id"] = session.id
+                row["stripe_payment_url"] = session.url
+                row["stripe_status"] = "link_generated"
+                row["stripe_timestamp"] = datetime.utcnow().isoformat()
+                print(f"      ✅ Link generated: {session.url}")
             except Exception as se:
-                print(f"   ❌ Stripe Session Creation Error for {ref}: {se}")
+                print(f"      ❌ Stripe Error: {se}")
 
-        # -------------------------------------------------------------
-        # STEP 2: EVALUATE TTLOCK ACCESS CODES
-        # -------------------------------------------------------------
-        done_locks_info = completed_locks_map.get(ref, {})
-        fd_row_written = False
-        room_row_written = False
+        # --- TASK B: MONITOR TTLOCK CODE DEPLOYMENTS ---
+        code_created = row.get("code_created", "no")
+        raw_response_str = row.get("ttlock_response", "")
 
-        # ---- A. Front Door Code ----
-        front_door_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
-        if front_door_lock_id:
-            fd_info = done_locks_info.get("front_door")
-            if fd_info:
-                if fd_info["start_ms"] == start_ms and fd_info["end_ms"] == end_ms:
-                    print(f"   ✅ Front door code is matching calendar windows – skipping API request.")
-                else:
-                    pwd_id = fd_info.get("keyboardPwdId")
+        # Target lock hardware metrics context
+        target_lock_id = None
+        if ltype == "front_door":
+            target_lock_id = prop_conf.get("FRONT_DOOR_LOCK_ID")
+        elif ltype == "room":
+            target_lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
+
+        if target_lock_id:
+            if code_created == "yes":
+                # Check if dates were changed in Phase 1
+                old_start = row.get("start_ms", "")
+                old_end = row.get("end_ms", "")
+                
+                dates_changed = (str(old_start) != str(start_ms)) or (str(old_end) != str(end_ms))
+                
+                if dates_changed:
+                    pwd_id = None
+                    try:
+                        resp_dict = ast.literal_eval(raw_response_str)
+                        pwd_id = resp_dict.get("keyboardPwdId")
+                    except: pass
+                    
                     if pwd_id:
-                        print(f"   🔄 Dates altered! Modifying FRONT DOOR valid window via API...")
-                        success, resp = tt.change_lock_code_period(front_door_lock_id, pwd_id, start_ms, end_ms)
-                        log_rows.append({
-                            "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                            "property_location": location, "door_number": "Front Door", "lock_type": "front_door",
-                            "code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms,
-                            "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                        })
-                        fd_row_written = True
-            else:
-                print(f"   🚪 Initializing FRONT DOOR entry pin (Code: {code})...")
-                success, resp = tt.create_lock_code_simple(front_door_lock_id, code, guest_name, start_ms, end_ms, f"Front Door ({location})", ref)
+                        print(f"   🔄 Scheduling window modification for {ref} — Lock ID {target_lock_id}")
+                        success, resp = tt.change_lock_code_period(target_lock_id, pwd_id, start_ms, end_ms)
+                        row["code_created"] = "yes" if success else "no"
+                        row["ttlock_response"] = str(resp)
+                        row["start_ms"] = start_ms
+                        row["end_ms"] = end_ms
+                    else:
+                        print(f"   ⚠️ Date shift detected for {ref}, but missing internal Password ID token. Re-creating entry code...")
+                        code_created = "no" # Force re-creation down fallback tracking index
+
+            if code_created != "yes":
+                print(f"   🚪 Generating hardware access credentials for {ref} — Type: {ltype.upper()}")
+                desc_label = "Front Door" if ltype == "front_door" else room_name
+                success, resp = tt.create_lock_code_simple(target_lock_id, code, guest_name, start_ms, end_ms, f"{desc_label} ({location})", ref)
+                
                 if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
-                    success = True # Catch duplicate pin codes as successes
-                log_rows.append({
-                    "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                    "property_location": location, "door_number": "Front Door", "lock_type": "front_door",
-                    "code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms,
-                    "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                })
-                fd_row_written = True
+                    success = True # Overpass lock-level duplicate designations gracefully
+                    
+                row["code_created"] = "yes" if success else "no"
+                row["ttlock_response"] = str(resp)
+                row["start_ms"] = start_ms
+                row["end_ms"] = end_ms
 
-        # ---- B. Room Door Code ----
-        room_lock_id = prop_conf.get("ROOM_LOCK_IDS", {}).get(room_name)
-        if room_lock_id:
-            room_info = done_locks_info.get("room")
-            if room_info:
-                if room_info["start_ms"] == start_ms and room_info["end_ms"] == end_ms:
-                    print(f"   ✅ Room code is matching calendar windows – skipping API request.")
-                else:
-                    pwd_id = room_info.get("keyboardPwdId")
-                    if pwd_id:
-                        print(f"   🔄 Dates altered! Modifying ROOM code valid window via API...")
-                        success, resp = tt.change_lock_code_period(room_lock_id, pwd_id, start_ms, end_ms)
-                        log_rows.append({
-                            "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                            "property_location": location, "door_number": room_name, "lock_type": "room",
-                            "code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms,
-                            "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                        })
-                        room_row_written = True
-            else:
-                print(f"   🚪 Initializing ROOM door entry pin (Room: {room_name} Code: {code})...")
-                success, resp = tt.create_lock_code_simple(room_lock_id, code, guest_name, start_ms, end_ms, f"{room_name} ({location})", ref)
-                if not success and isinstance(resp, dict) and resp.get("errcode") == -3007:
-                    success = True
-                log_rows.append({
-                    "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                    "property_location": location, "door_number": room_name, "lock_type": "room",
-                    "code_created": "yes" if success else "no", "ttlock_response": str(resp), "start_ms": start_ms, "end_ms": end_ms,
-                    "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                })
-                room_row_written = True
+        processed_log_rows.append(row)
 
-        # -------------------------------------------------------------
-        # STEP 3: HANDLE STRIPE PROGRESS LOG RETENTION
-        # -------------------------------------------------------------
-        if new_stripe_generated:
-            if not fd_row_written and front_door_lock_id:
-                fd_info = done_locks_info.get("front_door")
-                log_rows.append({
-                    "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                    "property_location": location, "door_number": "Front Door", "lock_type": "front_door",
-                    "code_created": "yes" if fd_info else "no", "ttlock_response": str(fd_info.get("raw_response", "")) if fd_info else "",
-                    "start_ms": start_ms, "end_ms": end_ms,
-                    "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                })
-            if not room_row_written and room_lock_id:
-                room_info = done_locks_info.get("room")
-                log_rows.append({
-                    "timestamp": datetime.utcnow().isoformat(), "reservation_code": ref, "guest_name": guest_name,
-                    "property_location": location, "door_number": room_name, "lock_type": "room",
-                    "code_created": "yes" if room_info else "no", "ttlock_response": str(room_info.get("raw_response", "")) if room_info else "",
-                    "start_ms": start_ms, "end_ms": end_ms,
-                    "stripe_session_id": stripe_id, "stripe_payment_url": stripe_url, "stripe_status": stripe_status, "stripe_timestamp": stripe_ts
-                })
-
-    # -------------------------------------------------------------
-    # STEP 4: CLEAN AND RE-WRITE MASTER STATUS LOG
-    # -------------------------------------------------------------
-    print("\n📝 Cleaning and updates writing to master log data tables...")
-    existing_df = pd.DataFrame()
-    if os.path.exists(LOG_PATH):
-        try:
-            existing_df = pd.read_csv(LOG_PATH, dtype=str)
-        except: pass
-
-    new_df = pd.DataFrame(log_rows, columns=LOG_FIELDNAMES)
-    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+    # --- SAVE UPDATED LOG DATA ---
+    print("\n📝 Committing changes to local storage tracker...")
+    final_df = pd.DataFrame(processed_log_rows, columns=LOG_FIELDNAMES)
+    final_df["timestamp"] = pd.to_datetime(final_df["timestamp"], errors='coerce')
     
-    # Fill structural vacancies for legacy row models
-    for col in LOG_FIELDNAMES:
-        if col not in combined_df.columns:
-            combined_df[col] = ""
-            
-    combined_df = combined_df.reindex(columns=LOG_FIELDNAMES)
-    combined_df["timestamp"] = pd.to_datetime(combined_df["timestamp"], errors='coerce')
-    combined_df = combined_df.dropna(subset=['reservation_code', 'lock_type'])
-    
-    # De-duplicate rows: Keep the newest timestamp for each unique reservation + lock type
-    cleaned_df = combined_df.sort_values(
-        by=['timestamp'], ascending=False
-    ).drop_duplicates(
+    # Maintain clean table sorting configurations
+    final_df = final_df.sort_values(by=['timestamp'], ascending=False).drop_duplicates(
         subset=['reservation_code', 'lock_type'], keep='first'
-    ).sort_values(
-        by=['timestamp'], ascending=True
-    )
+    ).sort_values(by=['timestamp'], ascending=True)
 
-    cleaned_df['timestamp'] = cleaned_df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f').str[:-3]
+    final_df['timestamp'] = final_df['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f').str[:-3]
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    cleaned_df.to_csv(LOG_PATH, index=False, quoting=csv.QUOTE_MINIMAL)
+    final_df.to_csv(LOG_PATH, index=False, quoting=csv.QUOTE_MINIMAL)
     
-    print(f"✔ Successfully saved {len(cleaned_df)} unique records to {LOG_PATH}")
+    print(f"✔ Master table fully refreshed with {len(final_df)} records.")
     print("=== Pipeline Execution Complete ===")
 
 if __name__ == "__main__":
