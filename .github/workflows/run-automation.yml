@@ -35,49 +35,27 @@ jobs:
           pip install pandas requests stripe gspread oauth2client
 
       # ---------------------------
-      # ENV VARS
+      # STEP 1 — CHECK CURRENT STRIPE STATUSES
       # ---------------------------
-      - name: Export environment variables
-        run: |
-          echo "TTLOCK_CLIENT_ID=${{ secrets.TTLOCK_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "TTLOCK_CLIENT_SECRET=${{ secrets.TTLOCK_CLIENT_SECRET }}" >> $GITHUB_ENV
-
-      # ---------------------------
-      # STEP 1 — RUN TTLOCK AUTOMATION
-      # ---------------------------
-      - name: Run TTLock Automation
-        run: python scripts/run_ttlock.py
-
-      # ---------------------------
-      # STEP 2 — PARSE TTLOCK LOGS
-      # ---------------------------
-      - name: Parse TTLock logs
-        run: python scripts/ttlock_log_parser.py
-
-      # ---------------------------
-      # STEP 3 — RESERVATION SUMMARY
-      # ---------------------------
-      - name: Build combined reservation summary CSV
-        run: python scripts/build_reservation_status.py
-
-      # ---------------------------
-      # STEP 4A — CHECK EXISTING STRIPE DEPOSITS
-      # ---------------------------
+      # Checks if any active links have been paid by guests and updates logs first
       - name: Check Stripe Payment Statuses
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: python scripts/check_stripe_status.py
 
       # ---------------------------
-      # STEP 4B — RUN STRIPE DEPOSITS
+      # STEP 2 — RUN UNIFIED RESERVATION PIPELINE
       # ---------------------------
-      - name: Run Stripe Pre-Auth Generator
+      # Executes lock code rules, link checking, and expiration overrides at once
+      - name: Run Unified Reservation Status Pipeline
         env:
+          TTLOCK_CLIENT_ID: ${{ secrets.TTLOCK_CLIENT_ID }}
+          TTLOCK_CLIENT_SECRET: ${{ secrets.TTLOCK_CLIENT_SECRET }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        run: python scripts/run_stripe_deposits.py
+        run: python scripts/run_reservation_pipeline.py
 
       # ---------------------------
-      # STEP 5 — PUSH DATA TO GOOGLE SHEETS
+      # STEP 3 — PUSH UNIFIED DATA TO GOOGLE SHEETS
       # ---------------------------
       - name: Export Data to Google Sheets
         env:
@@ -86,7 +64,7 @@ jobs:
         run: python scripts/push_to_sheets.py
 
       # ---------------------------
-      # STEP 6 — AUTOMATIC CLEANUP (DROPZONE WIPE)
+      # STEP 4 — AUTOMATIC CLEANUP (DROPZONE WIPE)
       # ---------------------------
       - name: Wipe Raw Input Data
         run: |
@@ -100,6 +78,7 @@ jobs:
         run: |
           git add -A automation-data/ || true
 
+      # Checks if reservation_status.csv was updated with new codes or links
       - name: Check if anything changed
         id: changes
         run: |
