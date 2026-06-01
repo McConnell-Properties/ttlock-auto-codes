@@ -30,6 +30,12 @@ TRACKING_FIELDS = [
     "timestamp"
 ]
 
+# Legacy ghost columns from older scripts that must be purged
+LEGACY_COLS = [
+    "reservation_code", "guest_name", "guest_email", "property_location", 
+    "door_number", "check_in", "check_out", "lock_type", "code_created", "ttlock_response"
+]
+
 # -----------------------------
 # ROBUST PARSING HELPERS
 # -----------------------------
@@ -71,7 +77,7 @@ def main():
     if os.path.exists(LOG_PATH):
         try:
             df_old = pd.read_csv(LOG_PATH, dtype=str)
-            print(f"📖 Found existing log file with {len(df_old)} entries. Running Auto-Heal & Merge...")
+            print(f"📖 Found existing log file with {len(df_old)} entries. Running Auto-Heal & Purge...")
             
             # Sort old to new so the newest updates are evaluated last
             if "timestamp" in df_old.columns:
@@ -106,8 +112,8 @@ def main():
                         bookings_state[ref]["room_lock_set"] = "True" if cc else "False"
                         bookings_state[ref]["room_ttlock_response"] = resp
 
-                # Erase the bad layout columns from memory
-                for col in ["lock_type", "code_created", "ttlock_response"]:
+                # PURGE GHOST COLUMNS: Erase legacy script headers so they don't export
+                for col in LEGACY_COLS:
                     bookings_state[ref].pop(col, None)
 
                 # Stripe live check
@@ -146,15 +152,15 @@ def main():
                 
                 for _, row in df_in.iterrows():
                     row_dict = row.to_dict()
-                    ref = find_field(row_dict, ["reservation_code", "Booking reference", "booking_reference"])
+                    ref = find_field(row_dict, ["Booking reference", "booking_reference", "reservation_code"])
                     if not ref: continue
                     
                     if ref not in bookings_state:
                         bookings_state[ref] = row_dict
                     else:
-                        # RESTORE DATA: Pull all 50+ CRM columns into memory, ignoring tracking fields
+                        # RESTORE DATA: Pull all CRM columns into memory, ignoring tracking fields
                         for k, v in row_dict.items():
-                            if pd.notna(v) and str(v).strip() and k not in TRACKING_FIELDS:
+                            if pd.notna(v) and str(v).strip() and k not in TRACKING_FIELDS and k not in LEGACY_COLS:
                                 bookings_state[ref][k] = v
             except: pass
 
@@ -165,8 +171,8 @@ def main():
     final_log_rows = []
 
     for ref, state in bookings_state.items():
-        ci = clean_date(find_field(state, ["check_in", "Check in date", "Check-in date"]))
-        co = clean_date(find_field(state, ["check_out", "Check out date", "Check-out date"]))
+        ci = clean_date(find_field(state, ["Check in date", "Check-in date"]))
+        co = clean_date(find_field(state, ["Check out date", "Check-out date"]))
         
         co_dt = pd.to_datetime(co, errors="coerce")
         ci_dt = pd.to_datetime(ci, errors="coerce")
@@ -177,15 +183,15 @@ def main():
             final_log_rows.append(state)
             continue
 
-        gname = find_field(state, ["guest_name", "Guest Name", "guest_first_name"])
+        gname = find_field(state, ["Guest Name"])
         if not gname or gname.lower() == "nan":
-            fname = find_field(state, ["guest_first_name", "Guest first name"])
-            lname = find_field(state, ["guest_last_name", "Guest last name"])
+            fname = find_field(state, ["Guest first name", "guest_first_name"])
+            lname = find_field(state, ["Guest last name", "guest_last_name"])
             gname = f"{fname} {lname}".strip()
             
-        location = find_field(state, ["property_location", "Property name", "property_name"])
-        room_name = find_field(state, ["door_number", "Rooms", "rooms", "room"])
-        email = find_field(state, ["guest_email", "Guest email", "email"])
+        location = find_field(state, ["Property name", "property_name"])
+        room_name = find_field(state, ["Rooms", "rooms", "room"])
+        email = find_field(state, ["Guest email", "email"])
         
         digits = re.sub(r"\D", "", ref)
         code = digits[-4:] if len(digits) >= 4 else None
@@ -311,6 +317,11 @@ def main():
 
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     
+    # Organize so Tracking Fields are neat at the beginning, followed by CRM Data
+    existing_tracking = [c for c in TRACKING_FIELDS if c in final_df.columns]
+    crm_cols = [c for c in final_df.columns if c not in existing_tracking]
+    final_df = final_df[existing_tracking + crm_cols]
+
     # Output ALL columns dynamically, no truncation!
     final_df.to_csv(LOG_PATH, index=False, quoting=csv.QUOTE_MINIMAL)
     print(f"✔ Master table refreshed with {len(final_df)} records.")
