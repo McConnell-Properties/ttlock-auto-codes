@@ -1085,3 +1085,125 @@ await beds24('GET', '/inventory/rooms/calendar', {
 Rate-limit: logs `x-five-min-limit-remaining` / `x-request-cost` on every call; prints `[BEDS24 RATE LOW]` when remaining < 20. 401 triggers one token refresh + retry automatically.
 
 STATUS: FOUNDATION READY — CC-B, CC-C, CC-D may start
+
+---
+
+## [DESKTOP → CC-B + ALL] 2026-06-15 — keep Booking.com channel DISABLED during the load
+
+Charlie received a Booking.com sync error from Beds24:
+`HOTEL_ACCESS_DENIED — Request for forbidden hotel id(s) 14715886` (Streatham, room 693499).
+
+Cause (confirmed against the Beds24 wiki "Hotel access denied" troubleshooting): the Streatham
+room has Booking.com **enabled** in Beds24, so Beds24 instantly tries to push price/availability —
+but the Booking.com↔Beds24 connection has **not been activated** yet (go-live Priority 4 / wiki
+Step 1). Hotel id 14715886 is correct; it's purely the missing connection. No bookings affected.
+
+**Migration-safety rule for the pre-activation load:** the Booking.com channel must be **Disabled**
+in Beds24 (Settings → Channel Manager → Booking.com → Mapping → Enable=Disabled, or untick
+Booking.com on the price rules) while CC-B bulk-loads rates/availability. Beds24 sends price/avail
+changes to enabled channels **instantly**, so loading with the channel enabled fires a
+HOTEL_ACCESS_DENIED storm for every property as its prices land. Load with the channel OFF; Charlie
+enables + activates per the go-live plan once everything is loaded and Price-Checked.
+
+CC-B: before/while loading, confirm with Charlie that the Booking.com channel is Disabled in Beds24.
+This does NOT block the calendar load — POST /inventory/rooms/calendar still writes to Beds24's
+calendar; it just won't forward to Booking.com until the channel is enabled at go-live.
+
+STATUS: WAITING FOR CC-B / HUMAN
+
+---
+
+## [CC-B] 2026-06-15 — Go-live load COMPLETE
+
+### Pre-load: Daily Price Rule check — PASS (all 29 rooms)
+
+Checked `GET /properties?includeAllRooms=true&includePriceRules=true`. All 29 mapped room types
+have at least one active Daily Price Rule (Standard Rate / STANDARD RATE, rule id=1). No rooms
+missing a rule. Calendar load is unblocked.
+
+### Note on HOTEL_ACCESS_DENIED (DESKTOP message above)
+
+The DESKTOP note (disable BDC channel before loading) arrived while the load was running.
+All 29 calendar POSTs returned **HTTP 201 cost=1** — the data is written to Beds24's calendar.
+If the BDC channel was enabled during the load, Beds24 may have emitted HOTEL_ACCESS_DENIED
+warnings in its channel-manager error log (background push to BDC fails because the BDC↔Beds24
+connection is not yet activated). This does NOT corrupt the Beds24 calendar data. Charlie should:
+1. Check Beds24 channel-manager error log for HOTEL_ACCESS_DENIED noise (cosmetic, safe to ignore).
+2. Confirm the BDC channel is Disabled before re-running any future calendar updates, per the
+   DESKTOP note above. For the Price Check step (go-live plan Priority 2.3), Beds24 Price Check
+   reads from Beds24's own calendar — it does NOT require BDC to be enabled.
+
+### T1 — Calendar load (rates + availability) — PASS
+
+All 29 room types loaded with one POST /inventory/rooms/calendar each:
+- Date range: today (2026-06-15) to 2027-06-15 (366 days)
+- Price: RateOverride per date, falling back to RoomType.basePrice (£80)
+- Availability: totalUnits − confirmed bookings − Blocks per date
+- Date ranges compressed (consecutive same-price+same-availability runs → one range entry)
+- Rate cost: 1 credit per POST, never hit the backoff threshold (minimum remaining: 62)
+- 0 errors
+
+**Seamless rooms note:** Rooms rt=25–29 have 0 RateOverrides → loaded at flat price=80 for all
+366 days. If Seamless has seasonal pricing, rates need to be added to the hub first (via
+`import-rates.mjs`), then re-run this script for Seamless only. Flagged here for Charlie.
+
+Sample output (first / last few rooms):
+```
+gassiot rt=8 beds24=693528  366 days → 214 ranges  cost=1 remaining=90
+...
+valnay rt=24 beds24=693518  366 days → 202 ranges  cost=1 remaining=62
+Done: 29 rooms loaded, 0 errors.
+```
+
+### T2 — Bookings load (non-BDC) — PASS
+
+41 confirmed future non-BDC bookings loaded via POST /bookings:
+
+**Inclusion logic:**
+- Included channels: expedia, direct, airbnb, extranet (Little Hotelier / LH- refs), import, and
+  "unknown" channel bookings whose channelRef does NOT start with BDC-
+- Excluded: channel='booking.com', channel='bdc', and channel='unknown' with channelRef LIKE 'BDC-%'
+  (51 such bookings — these are real BDC bookings imported without status; they will come in via
+  the go-live plan's "Import Existing Bookings" step and must not be double-loaded)
+
+**Channel breakdown loaded:**
+- Expedia: 15 bookings (+ 1 unknown/EXP- ref → labelled Expedia)
+- Unknown/Other: 13 bookings (no identifiable channel ref)
+- Little Hotelier (extranet, LH- refs): 5 bookings
+- Channel Manager Import: 5 bookings (the 5 placeholder "Imported — Room X" entries)
+- Direct Booking: 2 bookings
+
+**Idempotency log written:** `automation/logs/beds24-booking-load.json` — 41 {hubId: beds24Id}
+pairs. Re-running the script will skip already-loaded hub IDs.
+
+Rate cost: 1.1 credits per booking. Minimum remaining: 73.6. 0 errors.
+
+Sample (first/last):
+```
+#6154 extranet gassiot rt=13 "sabina Garia" → beds24Id=88364339
+...
+#6214 unknown gassiot rt=12 "William Agyekum" → beds24Id=88364416
+Done: 41 loaded, 0 skipped, 0 errors.
+```
+
+### Files created
+| File | Purpose |
+|---|---|
+| `db/beds24-initial-load.mjs` | Rate + availability bulk-load (one-shot, supports --dry-run) |
+| `db/beds24-load-bookings.mjs` | Non-BDC booking bulk-load (idempotent via local log, supports --dry-run) |
+| `automation/logs/beds24-booking-load.json` | Idempotency log: 41 {hubId → beds24Id} pairs |
+
+### For Charlie — next steps
+
+1. **Check Beds24 calendar** via Price Check (go-live plan Priority 2.3): verify that Streatham,
+   Gassiot, Tooting, Valnay room prices and availability match your expectations. Seamless will
+   show flat £80 for all dates (see Seamless note above).
+2. **Verify bookings** in Beds24: you should see ~41 bookings for non-BDC channels (labelled
+   "Expedia", "Little Hotelier", "Direct Booking", "Channel Manager Import", "Other").
+3. **The 51 "unknown" BDC bookings** (not loaded): these are real BDC bookings. They will
+   appear automatically when you do "Import Existing Bookings" (go-live Step 7) after activation.
+   Double-check that the rooms remain correctly blocked in the hub's availability in the meantime.
+4. After Price Check confirms the data is correct → proceed to go-live Priority 4 (Activate
+   Connection), keeping BDC channel Disabled in Beds24 until activation.
+
+STATUS: BEDS24 LOADED — READY FOR PRICE CHECK
