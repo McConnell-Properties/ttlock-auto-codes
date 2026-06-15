@@ -849,3 +849,138 @@ This installs the `poll-ttlock-arrivals` launchd job running every 20 min. It wi
 - Staff sets the manual "yes" toggle in the CRM.
 
 STATUS: WAITING FOR DESKTOP
+
+---
+
+## [CC-A] 2026-06-15 — Beds24 Foundation (T0 + Phase 0 + lib/beds24.ts + migration)
+
+### T0 — Credential identification
+
+The 172-char secret provided was an **invite code** (single-use). Called `GET /authentication/setup` with it; received HTTP 200 with `{token, refreshToken}`. This confirms **read+write scope** — the presence of a refreshToken (not returned for long-life/read-only tokens) is the discriminator.
+
+**Scopes confirmed:** `read:properties` ✓ `read:bookings` ✓ `read:bookings-personal` ✓ `read:inventory` ✓ `write:inventory` ✓ (POST /inventory/rooms/calendar returned HTTP 201)
+
+`BEDS24_REFRESH_TOKEN` stored in `.env` — **redacted here per security protocol**.
+
+Token refresh endpoint: `GET /authentication/token` with `refreshToken` header → `{token, expiresIn: 86400}`.
+
+### Phase 0 — Property/room discovery
+
+**4-vs-5 question resolved: ALL 5 properties are in Beds24** (including Seamless Stays, propId=335061).
+
+| Internal slug | Beds24 propId | # room types |
+|---|---|---|
+| streatham | 335059 | 7 |
+| seamless | 335061 | 5 |
+| tooting | 335062 | 6 |
+| valnay | 335063 | 4 |
+| gassiot | 335066 | 7 |
+
+BDC channel NOT yet connected (go-live Priority 4) — `GET /channels/settings` shows only airbnb/iCal channels, no BDC. bdcRoomId cross-reference via Beds24 is impossible until activation; mapping uses name + unit count matching against `ROOMTYPE_MAP_REFERENCE.md`.
+
+### Calendar field names verified (for CC-B and CC-D)
+
+Confirmed via live POST + response inspection:
+- Date range: `from` / `to` (YYYY-MM-DD, inclusive end) — NOT startDate/endDate in POST body
+- Price: `price1`
+- Availability: `numAvail` (silently capped to room qty — correct for single-unit rooms)
+- Min stay: `minStay`
+- GET query params: `startDate` / `endDate` (different from POST body field names)
+
+### Files created
+
+| File | Status |
+|---|---|
+| `lib/beds24.ts` | CREATED — token manager, `beds24()` helper, `buildCalendarPayload()` |
+| `db/migrate-beds24-ids.mjs` | CREATED — additive ALTER TABLE only, idempotent |
+
+Migration run against Turso cloud DB:
+- `ALTER TABLE "Property" ADD COLUMN "beds24PropId" TEXT` — OK
+- `ALTER TABLE "RoomType" ADD COLUMN "beds24RoomId" TEXT` — OK
+
+TypeScript: `npx tsc --noEmit` → **clean (0 errors)**.
+
+---
+
+### ⚠️ PROPOSED ID MAP — REQUIRES CHARLIE SIGN-OFF BEFORE ANY UPDATEs
+
+**Do not run UPDATE statements until Charlie confirms this map.** A wrong mapping mis-routes real bookings.
+
+#### High-confidence mappings (name + unit count match uniquely)
+
+| Property slug | Internal propId | beds24PropId | Confidence |
+|---|---|---|---|
+| streatham | (db prop row) | 335059 | EXACT |
+| seamless | (db prop row) | 335061 | EXACT |
+| tooting | (db prop row) | 335062 | EXACT |
+| valnay | (db prop row) | 335063 | EXACT |
+| gassiot | (db prop row) | 335066 | EXACT |
+
+#### Room type mappings
+
+| Property | Internal rtId | Internal name (from ROOMTYPE_MAP_REFERENCE) | beds24RoomId | Beds24 name | Confidence |
+|---|---|---|---|---|---|
+| streatham | 1 | Triple Room with Private Bathroom | 693503 | Triple Room | EXACT (name+units=1) |
+| streatham | 2 | Quad room, Shared Bathroom | 693501 | Quad Room | HIGH (name~, units=1) |
+| streatham | 3 | Superior King or Twin Room | 693505 | Superior King / Twin | EXACT (name+units=1) |
+| streatham | 4 | Double or Twin Room with Private Bathroom | 693504 | Double/Twin Ensuite | EXACT (name+units=1) |
+| streatham | 5 | Double room-Ensuite | 693499 | Double room-Ensuite | HIGH (name~, units=1) |
+| streatham | 6 | Twin Room, full private kitchen + ensuite | 693500 | Deluxe Apartment | MED — different Beds24 name; confirmed by elimination (only unmatched room on both sides) |
+| streatham | 7 | Basic Single Room with Shared Bathroom | 693502 | Basic Single | EXACT (name+units=1) |
+| seamless | 25 | Room 1 (bdcId=1268631801) | 693507 | Double Room with Shared Bathroom (a) | ⚠️ AMBIGUOUS — see below |
+| seamless | 26 | Large Double Room (bdcId=1268631803) | 693509 | Large Double Room | EXACT |
+| seamless | 27 | Single Room with Shared Bathroom (bdcId=1268631804) | 693510 | Single Room | EXACT |
+| seamless | 28 | Double Room with Shared Bathroom (bdcId=1268631802) | 693508 | Double Room with Shared Bathroom (b) | ⚠️ AMBIGUOUS — see below |
+| seamless | 29 | Deluxe Double Room (bdcId=1268631805) | 693511 | Deluxe Double Room | EXACT |
+| tooting | 15 | Room 1 (bdcId=1357689301) | 693512 | Double Room with Shared Bathroom | ⚠️ POSITIONAL — see below |
+| tooting | 16 | Room 2 (bdcId=1357689302) | 693513 | Double Room with Shared Bathroom | ⚠️ POSITIONAL |
+| tooting | 17 | Room 3 (bdcId=1357689304) | 693514 | Double Room with Shared Bathroom | ⚠️ POSITIONAL |
+| tooting | 18 | Room 4 (bdcId=1357689305) | 693515 | Double Room with Shared Bathroom | ⚠️ POSITIONAL |
+| tooting | 19 | Room 5 (bdcId=1357689306) | 693516 | Double Room with Shared Bathroom | ⚠️ POSITIONAL |
+| tooting | 20 | Room 6 / Deluxe (bdcId=1357689307) | 693517 | Deluxe Double Room | HIGH (only deluxe room on this property) |
+| valnay | 21 | Twin Room/Super King, Shared Bathroom | 693521 | Twin Room, Shared | HIGH |
+| valnay | 22 | Twin Room/Super King, En-suite | 693519 | Twin Ensuite | HIGH |
+| valnay | 23 | Business, Double Room, Shared Bathroom (units=3) | 693520 | Business Double, Shared | HIGH (units=3 unique — only multi-unit room at valnay) |
+| valnay | 24 | Double Room, Shared Bathroom | 693518 | Double Room, Shared | HIGH |
+| gassiot | 8 | Superior King or Twin Room | 693528 | Superior King or Twin | EXACT |
+| gassiot | 9 | Double Room, Shared Bathroom | 693526 | Double Room, Shared | HIGH |
+| gassiot | 10 | Twin or Super King in Cozy Room (Shared) (bdcId=1567633305) | 693524 | Twin Room with Shared Bathroom (a) | ⚠️ AMBIGUOUS — see below |
+| gassiot | 11 | Budget Double Room with Shared Bathroom | 693530 | Budget Double | EXACT |
+| gassiot | 12 | Basic Double Room with Shared Bathroom | 693529 | Basic Double | EXACT |
+| gassiot | 13 | Single Room, Shared bathroom | 693525 | Single Room | HIGH |
+| gassiot | 14 | Two Twin/Super King, Vented, Shared (bdcId=1567633301) | 693527 | Twin Room with Shared Bathroom (b) | ⚠️ AMBIGUOUS — see below |
+
+---
+
+### ⚠️ AMBIGUOUS CASES — Charlie must verify in Beds24 UI before UPDATEs run
+
+**Please check each of these in the Beds24 room settings and confirm the correct beds24RoomId.**
+
+#### 1. Seamless: rtId 25 vs 28 (NEEDS VERIFICATION)
+Both Beds24 rooms 693507 and 693508 show the same name "Double Room with Shared Bathroom".
+- Internal rtId=25 is "Room 1" on BDC (bdcId=1268631801)
+- Internal rtId=28 is "Double Room with Shared Bathroom" on BDC (bdcId=1268631802)
+- **Proposed:** rtId=25 → 693507, rtId=28 → 693508 (positional — lower BDC ID → lower Beds24 ID)
+- **Please verify in Beds24 UI: open room 693507 and 693508 and check if there's a distinguishing description, notes, or connection-code that matches Room 1 vs the generic Double.**
+
+#### 2. Tooting: rtIds 15–19 (NEEDS VERIFICATION)
+All five Beds24 rooms (693512–693516) are named "Double Room with Shared Bathroom" — indistinguishable by name.
+- **Proposed:** positional match: rtId=15→693512, 16→693513, 17→693514, 18→693515, 19→693516
+- The BDC room codes are sequential (1357689301–1357689306) and the Beds24 IDs are sequential. This is the most likely correct ordering but is NOT confirmed.
+- **Please verify in Beds24 UI: do rooms 693512–693516 have any notes/descriptions distinguishing them as Room 1–5? If not, does the ordering matter for CC-B's rate/availability load?** (For availability sync, if all 5 rooms sell the same product at the same price, any order is functionally equivalent. But for booking import it matters.)
+
+#### 3. Gassiot: rtId 10 vs 14 (NEEDS VERIFICATION)
+Two Beds24 rooms (693524 and 693527) both named "Twin Room with Shared Bathroom".
+- Internal rtId=10: "Twin or Super King in Cozy Room (Shared)" (bdcId=1567633305)
+- Internal rtId=14: "Two Twin/Super King, Vented, Shared" (bdcId=1567633301)
+- **Proposed:** rtId=14 (bdcId 1567633301, lower BDC ID) → 693524 (lower Beds24 ID), rtId=10 → 693527
+- **Please verify in Beds24 UI: open rooms 693524 and 693527 — check for notes "Cozy" or "Vented" that would disambiguate.**
+
+#### 4. Streatham: rtId 6 (note, not blocking)
+Beds24 room 693500 shows as "Deluxe Apartment" — internal name is "Twin Room, full private kitchen + ensuite". These could reasonably be the same room described differently.
+- **Matched by elimination** (only unmatched room on both sides after the other 6 are matched).
+- Confidence: MED. **Please confirm rtId=6 → 693500 is correct** (or flag if 693500 is a different room entirely).
+
+---
+
+STATUS: WAITING FOR HUMAN — Charlie to sign off ID map (especially the 4 ambiguous cases above) before CC-A runs UPDATEs
