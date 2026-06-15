@@ -984,3 +984,104 @@ Beds24 room 693500 shows as "Deluxe Apartment" — internal name is "Twin Room, 
 ---
 
 STATUS: WAITING FOR HUMAN — Charlie to sign off ID map (especially the 4 ambiguous cases above) before CC-A runs UPDATEs
+
+---
+
+## [DESKTOP → CC-A] 2026-06-15 — ID map SIGNED OFF (Charlie confirmed)
+
+All four ambiguous cases resolved. You may run the UPDATEs and post FOUNDATION READY.
+
+1. **Seamless 25 vs 28 — accept proposed, interchangeable.** Charlie: "does not matter, assign
+   either way" (the two are functionally/price-equivalent). Use rtId 25 → 693507, rtId 28 → 693508.
+2. **Tooting 15–19 — accept positional** (15→693512, 16→693513, 17→693514, 18→693515, 19→693516).
+   Five identical single-unit rooms at the same rate; bijection of identical rooms, so order is
+   functionally irrelevant for rate/availability sync.
+3. **Gassiot 10 vs 14 — identities confirmed by Charlie:** Cozy = physical **room 3** = rtId 10
+   (bdcId 1567633305); Vented = physical **room 2** = rtId 14 (bdcId 1567633301). To pick which
+   Beds24 id (693524 vs 693527) is which: **query Turso first** — compare the RateOverride
+   schedules (and basePrice) of rtId 10 vs rtId 14. *If identical* → assign either way (mark the
+   pair `verify-at-getcodes` in a note) and proceed. *If they differ* → try to match by
+   `maxPeople`/description from the `GET /properties` room data; if still indistinguishable, set
+   both rooms' rates **leave these two unmapped** and defer to the BDC "Get Codes" step rather
+   than risk swapping different rates. Report which path you took.
+4. **Streatham rtId 6 → 693500 ("Deluxe Apartment") — confirmed.** It's the only private-kitchen
+   unit (rooms.csv: Streatham room 9, kitchen=Yes, max occ 3) = internal "Twin Room, full private
+   kitchen + ensuite". Correct.
+
+After UPDATEs: post the final committed map + `STATUS: FOUNDATION READY` so CC-B/C/D can start.
+
+STATUS: WAITING FOR CC-A
+
+---
+
+## [CC-A] 2026-06-15 — UPDATEs executed, foundation committed
+
+### Gassiot 10-vs-14 resolution
+
+RateOverride comparison: rtId=10 and rtId=14 have identical schedules (347 rows each, min=50 max=135, 18 distinct prices, **0 dates with different prices**, same basePrice=80). Assigned either way per Charlie's instruction:
+- rtId=10 (Cozy, bdcId=1567633305) → beds24RoomId=**693527** — `verify-at-getcodes`
+- rtId=14 (Vented, bdcId=1567633301) → beds24RoomId=**693524** — `verify-at-getcodes`
+
+### UPDATEs run against Turso (cloud prod)
+
+All 34 rows: 5 × `Property.beds24PropId` + 29 × `RoomType.beds24RoomId`. Each `rowsAffected=1`. Zero nulls remaining on the 5 real properties.
+
+### Final committed map
+
+| Property | beds24PropId | rtId | beds24RoomId | Room name |
+|---|---|---|---|---|
+| streatham | 335059 | 1 | 693503 | Triple Room with Private Bathroom |
+| streatham | 335059 | 2 | 693501 | Quad room, with Shared Bathroom |
+| streatham | 335059 | 3 | 693505 | Superior King or Twin Room |
+| streatham | 335059 | 4 | 693504 | Double or Twin Room with Private Bathroom |
+| streatham | 335059 | 5 | 693499 | Double room-Ensuite |
+| streatham | 335059 | 6 | 693500 | Twin Room, full private kitchen + ensuite |
+| streatham | 335059 | 7 | 693502 | Basic Single Room with Shared Bathroom |
+| gassiot | 335066 | 8 | 693528 | Superior King or Twin Room |
+| gassiot | 335066 | 9 | 693526 | Double Room, Shared Bathroom |
+| gassiot | 335066 | 10 | 693527 | Twin/Super King Cozy (Shared) ⚠️ verify-at-getcodes |
+| gassiot | 335066 | 11 | 693530 | Budget Double Room with Shared Bathroom |
+| gassiot | 335066 | 12 | 693529 | Basic Double Room with Shared Bathroom |
+| gassiot | 335066 | 13 | 693525 | Single Room, Shared bathroom |
+| gassiot | 335066 | 14 | 693524 | Two Twin/Super King, Vented, Shared ⚠️ verify-at-getcodes |
+| tooting | 335062 | 15 | 693512 | Room 1 |
+| tooting | 335062 | 16 | 693513 | Room 2 |
+| tooting | 335062 | 17 | 693514 | Room 3 |
+| tooting | 335062 | 18 | 693515 | Room 4 |
+| tooting | 335062 | 19 | 693516 | Room 5 |
+| tooting | 335062 | 20 | 693517 | Room 6 (Deluxe) |
+| valnay | 335063 | 21 | 693521 | Twin Room/Super King, Shared Bathroom |
+| valnay | 335063 | 22 | 693519 | Twin Room/Super King, En-suite |
+| valnay | 335063 | 23 | 693520 | Business, Double Room, Shared Bathroom (units=3) |
+| valnay | 335063 | 24 | 693518 | Double Room, Shared Bathroom |
+| seamless | 335061 | 25 | 693507 | Room 1 (interchangeable per Charlie) |
+| seamless | 335061 | 26 | 693509 | Large Double Room |
+| seamless | 335061 | 27 | 693510 | Single Room with Shared Bathroom |
+| seamless | 335061 | 28 | 693508 | Double Room with Shared Bathroom (interchangeable) |
+| seamless | 335061 | 29 | 693511 | Deluxe Double Room |
+
+### lib/beds24.ts API summary (for CC-B/CC-D)
+
+```typescript
+import { getToken, beds24, buildCalendarPayload } from '@/lib/beds24';
+
+// Token (auto-cached in Turso Setting key='beds24_token', refreshed on expiry)
+const token = await getToken();
+
+// Generic helper
+const props = await beds24<PropertiesResponse>('GET', '/properties');
+
+// Calendar push
+const payload = buildCalendarPayload([
+  { roomId: 693503, from: '2026-07-01', to: '2026-07-07', price: 120, numAvail: 1, minStay: 2 }
+]);
+await beds24('POST', '/inventory/rooms/calendar', { body: payload });
+// GET uses startDate/endDate (not from/to) as query params:
+await beds24('GET', '/inventory/rooms/calendar', {
+  query: { roomId: 693503, startDate: '2026-07-01', endDate: '2026-07-07' }
+});
+```
+
+Rate-limit: logs `x-five-min-limit-remaining` / `x-request-cost` on every call; prints `[BEDS24 RATE LOW]` when remaining < 20. 401 triggers one token refresh + retry automatically.
+
+STATUS: FOUNDATION READY — CC-B, CC-C, CC-D may start
