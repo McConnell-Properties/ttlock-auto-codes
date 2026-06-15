@@ -1,0 +1,3 @@
+plan,switches,total_price,full_price,preferred_nights,segment_detail,label,equivalent_alternatives,warning
+Room 6 (Jul 19–Aug 26),0,2128.75,3275.0,0,Room 6: 38 nights × avg £86.18 = £3275.00,fewest switches,,UNALLOCATED bookings overlap this range (4)
+Room 6 (Jul 19–Jul 22) → Room 7 (Jul 22–Aug 26),1,1940.25,2985.0,0,Room 6: 3 nights × avg £76.67 = £230.00 | Room 7: 35 nights × avg £78.71 = £2755.00,cheapest,,UNALLOCATED bookings overlap this range (4)

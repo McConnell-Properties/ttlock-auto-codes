@@ -1,0 +1,27 @@
+# Cloudflare Tunnel config for the Streatham booking site.
+# Copy this to ~/.cloudflared/config.yml on the Mac mini:
+#
+#   cp "/Users/charliemcconnell/ttlock-auto-codes/IT/booking-site/deploy/config.yml" ~/.cloudflared/config.yml
+#
+# Tunnel ID 607f81df-a9ff-41ef-ad41-e92d902e740c is already filled in below.
+# Confirm the credentials file exists at the path on line 11
+# (ls ~/.cloudflared/) — if not, it's wherever `cloudflared tunnel create`
+# wrote it.
+#
+# The tunnel exposes ONLY the booking site (port 4100). The channel manager
+# (port 3002) stays private on localhost.
+
+tunnel: 607f81df-a9ff-41ef-ad41-e92d902e740c
+credentials-file: /Users/charliemcconnell/.cloudflared/607f81df-a9ff-41ef-ad41-e92d902e740c.json
+
+ingress:
+  - hostname: www.streathamrooms.co.uk
+    service: http://localhost:4100
+  - hostname: www.gassiothouse.co.uk
+    service: http://localhost:4100
+  # Optional: also serve the apex domains if you route them too.
+  # - hostname: streathamrooms.co.uk
+  #   service: http://localhost:4100
+  # - hostname: gassiothouse.co.uk
+  #   service: http://localhost:4100
+  - service: http_status:404

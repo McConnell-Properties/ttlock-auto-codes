@@ -1,0 +1,188 @@
+=== 2026-06-14 13:52:05 poll-ttlock-arrivals: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/poll-ttlock-arrivals.sh
+=== poll-ttlock-arrivals 2026-06-14 ===
+
+In-stay bookings: 39
+
+  [#1780 LH26052056179749 gassiot/4] no match  code=9749  lockId=31424108  records=255
+  [#1743 BDC-5344705579 streatham/7] no match  code=5579  lockId=26157268  records=54
+  [#1746 BDC-5943070270 gassiot/1] no match  code=0270  lockId=31262246  records=165
+  [#1772 BDC-6319703877 tooting/3] no match  code=3877  lockId=21319208  records=96
+  [#1739 BBN-BBE26052121024122 streatham/6] no match  code=4122  lockId=24717242  records=299
+  [#1773 BDC-6355049742 tooting/5] no match  code=9742  lockId=21321314  records=147
+  [#1781 BDC-6725546139 streatham/3] no match  code=6139  lockId=24719570  records=54
+  [#1774 BDC-5358478408 tooting/1] no match  code=8408  lockId=21318606  records=191
+  [#1866 BDC-6288175310 gassiot/2] no match  code=5310  lockId=31261208  records=39
+  [#1904 BDC-5114878501 seamless/2] SKIP: property has no lock map (Seamless/Flat)
+  [#1750 BDC-6219790263 gassiot/5] no match  code=0263  lockId=31263276  records=12
+  [#1751 BDC-6314963444 streatham/2] no match  code=3444  lockId=24641840  records=37
+  [#1766 LH26052156208224 streatham/4] no match  code=8224  lockId=24746950  records=27
+  [#1769 LH26052156208711 valnay/1] no match  code=8711  lockId=31453562  records=8
+  [#1857 BDC-6567100167 tooting/4] no match  code=0167  lockId=21321180  records=19
+  [#1876 BDC-5042759737 streatham/8] no match  code=9737  lockId=30947344  records=5
+  [#1742 BDC-5298967231 gassiot/6] no match  code=7231  lockId=31423836  records=20
+  [#1771 EXP-2451570313 streatham/11] no match  code=0313  lockId=16273050  records=100
+  [#1905 BDC-6358052858 seamless/1] SKIP: property has no lock map (Seamless/Flat)
+  [#2046 AIR-HM985W324Q flat/1] SKIP: property has no lock map (Seamless/Flat)
+  [#1783 BDC-6761111643 valnay/2] no match  code=1643  lockId=31285682  records=22
+  [#1842 BDC-6355259947 streatham/9] no match  code=9947  lockId=24692300  records=12
+  [#1856 BDC-6030035160 valnay/6] no match  code=5160  lockId=31284258  records=22
+  [#1858 BDC-5343860325 tooting/2] no match  code=0325  lockId=21321678  records=7
+  [#1886 BDC-5345652660 streatham/null] SKIP: room 'null' not in lock map for streatham
+  [#1907 BDC-6347672054 gassiot/7] no match  code=2054  lockId=31262938  records=0
+  [#1113 no-ref streatham/5] SKIP: no channelRef
+  [#1756 EXP-2471271477 gassiot/3] no match  code=1477  lockId=31262700  records=13
+  [#1761 EXP-2407196009 streatham/1] no match  code=6009  lockId=24719576  records=3
+  [#1789 BDC-5912811409 valnay/3] no match  code=1409  lockId=30948194  records=15
+  [#1793 BDC-6932187933 valnay/4] no match  code=7933  lockId=28062262  records=14
+  [#1841 BDC-5350515492 valnay/5] no match  code=5492  lockId=28065142  records=8
+  [#1843 BDC-6911375334 streatham/10] no match  code=5334  lockId=24717964  records=15
+  [#2055 BDC-5401819934 seamless/null] SKIP: property has no lock map (Seamless/Flat)
+  [#1770 LH26052156209349 valnay/5] no match  code=9349  lockId=28065142  records=3
+  [#1792 EXP-2475683686 gassiot/7] no match  code=3686  lockId=31262938  records=0
+  [#1844 BDC-5269007002 streatham/4] no match  code=7002  lockId=24746950  records=4
+  [#2056 BDC-6392998051 tooting/6] no match  code=8051  lockId=21973872  records=0
+  [#2066 no-ref streatham/11] SKIP: no channelRef
+
+Done: 0 detected, 32 no-match, 7 skipped.
+=== 2026-06-14 13:52:23 poll-ttlock-arrivals: exit 0
+=== 2026-06-14 13:53:02 poll-ttlock-arrivals: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/poll-ttlock-arrivals.sh
+=== poll-ttlock-arrivals 2026-06-14 ===
+
+In-stay bookings: 39
+
+  [#1780 LH26052056179749 gassiot/4] no match  code=9749  lockId=31424108  records=255
+  [#1743 BDC-5344705579 streatham/7] no match  code=5579  lockId=26157268  records=54
+  [#1746 BDC-5943070270 gassiot/1] no match  code=0270  lockId=31262246  records=165
+  [#1772 BDC-6319703877 tooting/3] no match  code=3877  lockId=21319208  records=96
+  [#1739 BBN-BBE26052121024122 streatham/6] no match  code=4122  lockId=24717242  records=299
+  [#1773 BDC-6355049742 tooting/5] no match  code=9742  lockId=21321314  records=147
+  [#1781 BDC-6725546139 streatham/3] no match  code=6139  lockId=24719570  records=54
+  [#1774 BDC-5358478408 tooting/1] no match  code=8408  lockId=21318606  records=191
+  [#1866 BDC-6288175310 gassiot/2] no match  code=5310  lockId=31261208  records=39
+  [#1904 BDC-5114878501 seamless/2] SKIP: property has no lock map (Seamless/Flat)
+  [#1750 BDC-6219790263 gassiot/5] no match  code=0263  lockId=31263276  records=12
+  [#1751 BDC-6314963444 streatham/2] no match  code=3444  lockId=24641840  records=37
+  [#1766 LH26052156208224 streatham/4] no match  code=8224  lockId=24746950  records=27
+  [#1769 LH26052156208711 valnay/1] no match  code=8711  lockId=31453562  records=8
+  [#1857 BDC-6567100167 tooting/4] no match  code=0167  lockId=21321180  records=19
+  [#1876 BDC-5042759737 streatham/8] no match  code=9737  lockId=30947344  records=5
+  [#1742 BDC-5298967231 gassiot/6] no match  code=7231  lockId=31423836  records=20
+  [#1771 EXP-2451570313 streatham/11] no match  code=0313  lockId=16273050  records=100
+  [#1905 BDC-6358052858 seamless/1] SKIP: property has no lock map (Seamless/Flat)
+  [#2046 AIR-HM985W324Q flat/1] SKIP: property has no lock map (Seamless/Flat)
+  [#1783 BDC-6761111643 valnay/2] no match  code=1643  lockId=31285682  records=22
+  [#1842 BDC-6355259947 streatham/9] no match  code=9947  lockId=24692300  records=12
+  [#1856 BDC-6030035160 valnay/6] no match  code=5160  lockId=31284258  records=22
+  [#1858 BDC-5343860325 tooting/2] no match  code=0325  lockId=21321678  records=7
+  [#1886 BDC-5345652660 streatham/null] SKIP: room 'null' not in lock map for streatham
+  [#1907 BDC-6347672054 gassiot/7] no match  code=2054  lockId=31262938  records=0
+  [#1113 no-ref streatham/5] SKIP: no channelRef
+  [#1756 EXP-2471271477 gassiot/3] no match  code=1477  lockId=31262700  records=13
+  [#1761 EXP-2407196009 streatham/1] no match  code=6009  lockId=24719576  records=3
+  [#1789 BDC-5912811409 valnay/3] no match  code=1409  lockId=30948194  records=15
+  [#1793 BDC-6932187933 valnay/4] no match  code=7933  lockId=28062262  records=14
+  [#1841 BDC-5350515492 valnay/5] no match  code=5492  lockId=28065142  records=8
+  [#1843 BDC-6911375334 streatham/10] no match  code=5334  lockId=24717964  records=15
+  [#2055 BDC-5401819934 seamless/null] SKIP: property has no lock map (Seamless/Flat)
+  [#1770 LH26052156209349 valnay/5] no match  code=9349  lockId=28065142  records=3
+  [#1792 EXP-2475683686 gassiot/7] no match  code=3686  lockId=31262938  records=0
+  [#1844 BDC-5269007002 streatham/4] no match  code=7002  lockId=24746950  records=4
+  [#2056 BDC-6392998051 tooting/6] no match  code=8051  lockId=21973872  records=0
+  [#2066 no-ref streatham/11] SKIP: no channelRef
+
+Done: 0 detected, 32 no-match, 7 skipped.
+=== 2026-06-14 13:53:19 poll-ttlock-arrivals: exit 0
+=== 2026-06-14 14:00:05 poll-ttlock-arrivals: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/poll-ttlock-arrivals.sh
+=== poll-ttlock-arrivals 2026-06-14 ===
+
+In-stay bookings: 39
+
+  [#1780 LH26052056179749 gassiot/4] no match  code=9749  lockId=31424108  records=255
+  [#1743 BDC-5344705579 streatham/7] no match  code=5579  lockId=26157268  records=54
+  [#1746 BDC-5943070270 gassiot/1] no match  code=0270  lockId=31262246  records=165
+  [#1772 BDC-6319703877 tooting/3] no match  code=3877  lockId=21319208  records=96
+  [#1739 BBN-BBE26052121024122 streatham/6] no match  code=4122  lockId=24717242  records=301
+  [#1773 BDC-6355049742 tooting/5] no match  code=9742  lockId=21321314  records=148
+  [#1781 BDC-6725546139 streatham/3] no match  code=6139  lockId=24719570  records=54
+  [#1774 BDC-5358478408 tooting/1] no match  code=8408  lockId=21318606  records=191
+  [#1866 BDC-6288175310 gassiot/2] no match  code=5310  lockId=31261208  records=39
+  [#1904 BDC-5114878501 seamless/2] SKIP: property has no lock map (Seamless/Flat)
+  [#1750 BDC-6219790263 gassiot/5] no match  code=0263  lockId=31263276  records=12
+  [#1751 BDC-6314963444 streatham/2] no match  code=3444  lockId=24641840  records=37
+  [#1766 LH26052156208224 streatham/4] no match  code=8224  lockId=24746950  records=27
+  [#1769 LH26052156208711 valnay/1] no match  code=8711  lockId=31453562  records=8
+  [#1857 BDC-6567100167 tooting/4] no match  code=0167  lockId=21321180  records=19
+  [#1876 BDC-5042759737 streatham/8] no match  code=9737  lockId=30947344  records=5
+  [#1742 BDC-5298967231 gassiot/6] no match  code=7231  lockId=31423836  records=20
+  [#1771 EXP-2451570313 streatham/11] no match  code=0313  lockId=16273050  records=100
+  [#1905 BDC-6358052858 seamless/1] SKIP: property has no lock map (Seamless/Flat)
+  [#2046 AIR-HM985W324Q flat/1] SKIP: property has no lock map (Seamless/Flat)
+  [#1783 BDC-6761111643 valnay/2] no match  code=1643  lockId=31285682  records=22
+  [#1842 BDC-6355259947 streatham/9] no match  code=9947  lockId=24692300  records=12
+  [#1856 BDC-6030035160 valnay/6] no match  code=5160  lockId=31284258  records=22
+  [#1858 BDC-5343860325 tooting/2] no match  code=0325  lockId=21321678  records=7
+  [#1886 BDC-5345652660 streatham/null] SKIP: room 'null' not in lock map for streatham
+  [#1907 BDC-6347672054 gassiot/7] no match  code=2054  lockId=31262938  records=0
+  [#1113 no-ref streatham/5] SKIP: no channelRef
+  [#1756 EXP-2471271477 gassiot/3] no match  code=1477  lockId=31262700  records=13
+  [#1761 EXP-2407196009 streatham/1] no match  code=6009  lockId=24719576  records=3
+  [#1789 BDC-5912811409 valnay/3] no match  code=1409  lockId=30948194  records=15
+  [#1793 BDC-6932187933 valnay/4] no match  code=7933  lockId=28062262  records=14
+  [#1841 BDC-5350515492 valnay/5] no match  code=5492  lockId=28065142  records=8
+  [#1843 BDC-6911375334 streatham/10] no match  code=5334  lockId=24717964  records=15
+  [#2055 BDC-5401819934 seamless/null] SKIP: property has no lock map (Seamless/Flat)
+  [#1770 LH26052156209349 valnay/5] no match  code=9349  lockId=28065142  records=3
+  [#1792 EXP-2475683686 gassiot/7] no match  code=3686  lockId=31262938  records=0
+  [#1844 BDC-5269007002 streatham/4] no match  code=7002  lockId=24746950  records=4
+  [#2056 BDC-6392998051 tooting/6] no match  code=8051  lockId=21973872  records=0
+  [#2066 no-ref streatham/11] SKIP: no channelRef
+
+Done: 0 detected, 32 no-match, 7 skipped.
+=== 2026-06-14 14:00:22 poll-ttlock-arrivals: exit 0
+=== 2026-06-14 17:00:04 poll-ttlock-arrivals: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/poll-ttlock-arrivals.sh
+=== poll-ttlock-arrivals 2026-06-14 ===
+
+In-stay bookings: 39
+
+  [#1780 LH26052056179749 gassiot/4] no unlocks  lockId=31424108  records=255
+  [#1743 BDC-5344705579 streatham/7] UNLOCKED ✓  lockId=26157268  last=2026-06-14T12:00:19.000Z  (2 unlocks)
+  [#1746 BDC-5943070270 gassiot/1] UNLOCKED ✓  lockId=31262246  last=2026-06-14T13:29:45.000Z  (2 unlocks)
+  [#1772 BDC-6319703877 tooting/3] no unlocks  lockId=21319208  records=96
+  [#1739 BBN-BBE26052121024122 streatham/6] UNLOCKED ✓  lockId=24717242  last=2026-06-14T15:55:14.000Z  (271 unlocks)
+  [#1773 BDC-6355049742 tooting/5] UNLOCKED ✓  lockId=21321314  last=2026-06-04T12:03:09.000Z  (1 unlock)
+  [#1781 BDC-6725546139 streatham/3] UNLOCKED ✓  lockId=24719570  last=2026-06-14T12:03:20.000Z  (9 unlocks)
+  [#1774 BDC-5358478408 tooting/1] UNLOCKED ✓  lockId=21318606  last=2026-06-14T15:15:57.000Z  (2 unlocks)
+  [#1866 BDC-6288175310 gassiot/2] UNLOCKED ✓  lockId=31261208  last=2026-06-07T11:29:27.000Z  (1 unlock)
+  [#1904 BDC-5114878501 seamless/2] SKIP: no lock map (Seamless/Flat)
+  [#1750 BDC-6219790263 gassiot/5] UNLOCKED ✓  lockId=31263276  last=2026-06-14T14:13:00.000Z  (1 unlock)
+  [#1751 BDC-6314963444 streatham/2] UNLOCKED ✓  lockId=24641840  last=2026-06-14T11:03:36.000Z  (30 unlocks)
+  [#1766 LH26052156208224 streatham/4] UNLOCKED ✓  lockId=24746950  last=2026-06-14T12:02:29.000Z  (10 unlocks)
+  [#1769 LH26052156208711 valnay/1] UNLOCKED ✓  lockId=31453562  last=2026-06-10T13:32:11.000Z  (2 unlocks)
+  [#1857 BDC-6567100167 tooting/4] UNLOCKED ✓  lockId=21321180  last=2026-06-13T11:52:00.000Z  (1 unlock)
+  [#1876 BDC-5042759737 streatham/8] no unlocks  lockId=30947344  records=5
+  [#1742 BDC-5298967231 gassiot/6] no unlocks  lockId=31423836  records=20
+  [#1771 EXP-2451570313 streatham/11] UNLOCKED ✓  lockId=16273050  last=2026-06-14T15:54:46.000Z  (43 unlocks)
+  [#1905 BDC-6358052858 seamless/1] SKIP: no lock map (Seamless/Flat)
+  [#2046 AIR-HM985W324Q flat/1] SKIP: no lock map (Seamless/Flat)
+  [#1783 BDC-6761111643 valnay/2] UNLOCKED ✓  lockId=31285682  last=2026-06-12T12:53:44.000Z  (1 unlock)
+  [#1842 BDC-6355259947 streatham/9] no unlocks  lockId=24692300  records=12
+  [#1856 BDC-6030035160 valnay/6] UNLOCKED ✓  lockId=31284258  last=2026-06-12T13:07:03.000Z  (2 unlocks)
+  [#1858 BDC-5343860325 tooting/2] UNLOCKED ✓  lockId=21321678  last=2026-06-14T15:38:36.000Z  (2 unlocks)
+  [#1886 BDC-5345652660 streatham/null] SKIP: room 'null' not in lock map for streatham
+  [#1907 BDC-6347672054 gassiot/7] no unlocks  lockId=31262938  records=4
+  [#1113 no-ref streatham/5] UNLOCKED ✓  lockId=24717236  last=2026-06-14T09:11:15.000Z  (6 unlocks)
+  [#1756 EXP-2471271477 gassiot/3] UNLOCKED ✓  lockId=31262700  last=2026-06-13T15:27:13.000Z  (1 unlock)
+  [#1761 EXP-2407196009 streatham/1] no unlocks  lockId=24719576  records=3
+  [#1789 BDC-5912811409 valnay/3] UNLOCKED ✓  lockId=30948194  last=2026-06-13T13:16:35.000Z  (1 unlock)
+  [#1793 BDC-6932187933 valnay/4] UNLOCKED ✓  lockId=28062262  last=2026-06-13T13:18:29.000Z  (1 unlock)
+  [#1841 BDC-5350515492 valnay/5] UNLOCKED ✓  lockId=28065142  last=2026-06-13T13:23:16.000Z  (1 unlock)
+  [#1843 BDC-6911375334 streatham/10] UNLOCKED ✓  lockId=24717964  last=2026-06-13T00:37:20.000Z  (1 unlock)
+  [#2055 BDC-5401819934 seamless/null] SKIP: no lock map (Seamless/Flat)
+  [#1770 LH26052156209349 valnay/5] no unlocks  lockId=28065142  records=3
+  [#1792 EXP-2475683686 gassiot/7] no unlocks  lockId=31262938  records=4
+  [#1844 BDC-5269007002 streatham/4] UNLOCKED ✓  lockId=24746950  last=2026-06-14T12:02:29.000Z  (2 unlocks)
+  [#2056 BDC-6392998051 tooting/6] no unlocks  lockId=21973872  records=0
+  [#2066 no-ref streatham/11] UNLOCKED ✓  lockId=16273050  last=2026-06-14T15:54:46.000Z  (3 unlocks)
+
+Done: 24 detected, 10 no unlocks, 5 skipped.
+=== 2026-06-14 17:00:26 poll-ttlock-arrivals: exit 0

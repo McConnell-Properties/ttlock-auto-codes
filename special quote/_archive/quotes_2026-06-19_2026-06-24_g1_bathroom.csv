@@ -1,0 +1,5 @@
+plan,switches,total_price,full_price,preferred_nights,segment_detail,label,equivalent_alternatives,warning
+Room 3 (Jun 19–Jun 24),0,251.6,370.0,5,"Room 3: 5 nights × avg £74.00, 32% off = £251.60","fewest switches, most preferred nights",,UNALLOCATED bookings overlap this range (3)
+Room 7 (Jun 19–Jun 22) → Room 5 (Jun 22–Jun 24),1,233.2,305.0,0,"Room 7: 3 nights × avg £60.00, 26% off = £133.20 | Room 5: 2 nights × avg £62.50, 20% off = £100.00",cheapest,,UNALLOCATED bookings overlap this range (3)
+Room 7 (Jun 19–Jun 23) → Room 3 (Jun 23–Jun 24),1,248.9,310.0,1,"Room 7: 4 nights × avg £58.75, 26% off = £173.90 | Room 3: 1 night × avg £75.00, 0% off = £75.00",,Room 7 (Jun 19–Jun 23) → Room 8 (Jun 23–Jun 24),UNALLOCATED bookings overlap this range (3)
+Room 7 (Jun 19–Jun 22) → Room 3 (Jun 22–Jun 24),1,249.2,325.0,2,"Room 7: 3 nights × avg £60.00, 26% off = £133.20 | Room 3: 2 nights × avg £72.50, 20% off = £116.00",,,UNALLOCATED bookings overlap this range (3)

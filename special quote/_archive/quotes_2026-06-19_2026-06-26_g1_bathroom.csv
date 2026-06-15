@@ -1,0 +1,3 @@
+plan,switches,total_price,full_price,preferred_nights,segment_detail,label,equivalent_alternatives,warning
+Room 5 (Jun 19–Jun 20) → Room 9 (Jun 20–Jun 26),1,435.6,610.0,6,"Room 5: 1 night × avg £65.00, 0% off = £65.00 | Room 9: 6 nights × avg £90.83, 32% off = £370.60","fewest switches, most preferred nights",,UNALLOCATED bookings overlap this range (3)
+Room 5 (Jun 19–Jun 20) → Room 9 (Jun 20–Jun 23) → Room 5 (Jun 23–Jun 26),2,412.8,535.0,3,"Room 5: 1 night × avg £65.00, 0% off = £65.00 | Room 9: 3 nights × avg £88.33, 26% off = £196.10 | Room 5: 3 nights × avg £68.33, 26% off = £151.70",cheapest,,UNALLOCATED bookings overlap this range (3)

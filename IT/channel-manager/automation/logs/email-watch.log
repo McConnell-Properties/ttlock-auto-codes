@@ -1,0 +1,732 @@
+=== 2026-06-13 02:40:04 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 01:40:05 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 01:40:05 new mail (startup) — running poller
+CANCELLED 6145497074 — no matching booking, flagged for review
+CANCELLED 5358762348 — no matching booking, flagged for review
+CANCELLED 6219725679 — no matching booking, flagged for review
+NEW 6867788954 (hotel ?, check-in 2026-06-23) — detail-fetch task queued
+NEW 5552595259 (hotel ?, check-in 2026-08-02) — detail-fetch task queued
+MODIFIED 5042759737 (hotel ?, check-in 2026-06-10) — detail-fetch task queued
+MODIFIED 5042759737 (hotel ?, check-in 2026-06-10) — detail-fetch task queued
+NEW 6154771629 (hotel ?, check-in 2026-08-15) — detail-fetch task queued
+NEW 5042795109 (hotel ?, check-in 2026-06-16) — detail-fetch task queued
+NEW 6530310189 (hotel ?, check-in 2026-08-13) — detail-fetch task queued
+NEW 5523436588 (hotel ?, check-in 2026-07-29) — detail-fetch task queued
+NEW 6154749533 (hotel ?, check-in 2026-06-19) — detail-fetch task queued
+NEW 5573427395 (hotel ?, check-in 2026-07-02) — detail-fetch task queued
+NEW 6796424278 (hotel ?, check-in 2026-06-21) — detail-fetch task queued
+NEW 6503771341 (hotel ?, check-in 2026-07-04) — detail-fetch task queued
+NEW 6582260034 (hotel ?, check-in 2026-08-16) — detail-fetch task queued
+NEW 5952616193 (hotel ?, check-in 2026-08-19) — detail-fetch task queued
+CANCELLED 6459574222 — no matching booking, flagged for review
+NEW 5536668186 (hotel ?, check-in 2026-08-15) — detail-fetch task queued
+NEW 5026011740 (hotel ?, check-in 2026-07-31) — detail-fetch task queued
+MODIFIED 5026011740 (hotel ?, check-in 2026-07-31) — detail-fetch task queued
+MODIFIED 5026011740 (hotel ?, check-in 2026-07-31) — detail-fetch task queued
+CANCELLED 5026011740 — no matching booking, flagged for review
+NEW 5000831532 (hotel ?, check-in 2026-08-01) — detail-fetch task queued
+NEW 5246630459 (hotel ?, check-in 2026-09-13) — detail-fetch task queued
+NEW 5000881780 (hotel ?, check-in 2026-06-15) — detail-fetch task queued
+NEW 6088459774 (hotel ?, check-in 2026-06-30) — detail-fetch task queued
+NEW 5246684682 (hotel ?, check-in 2026-09-25) — detail-fetch task queued
+NEW 6795911658 (hotel ?, check-in 2026-07-02) — detail-fetch task queued
+NEW 6051641583 (hotel ?, check-in 2026-08-20) — detail-fetch task queued
+NEW 6039507646 (hotel ?, check-in 2026-07-30) — detail-fetch task queued
+NEW 5246633942 (hotel ?, check-in 2026-06-15) — detail-fetch task queued
+NEW 6796404581 (hotel ?, check-in 2026-08-01) — detail-fetch task queued
+NEW 6449419685 (hotel ?, check-in 2026-09-04) — detail-fetch task queued
+NEW 6503772077 (hotel ?, check-in 2026-09-11) — detail-fetch task queued
+NEW 6282974564 (hotel ?, check-in 2026-07-02) — detail-fetch task queued
+NEW 5000834595 (hotel ?, check-in 2026-06-26) — detail-fetch task queued
+NEW 5246635679 (hotel ?, check-in 2026-07-16) — detail-fetch task queued
+NEW 6008857817 (hotel ?, check-in 2027-04-26) — detail-fetch task queued
+MODIFIED 6008857817 (hotel ?, check-in 2027-04-26) — detail-fetch task queued
+MODIFIED 6008857817 (hotel ?, check-in 2027-04-26) — detail-fetch task queued
+NEW 6582235746 (hotel ?, check-in 2026-08-03) — detail-fetch task queued
+NEW 5345663241 (hotel ?, check-in 2026-07-15) — detail-fetch task queued
+NEW 6483666230 (hotel ?, check-in 2026-12-17) — detail-fetch task queued
+NEW 5592986865 (hotel ?, check-in 2026-06-19) — detail-fetch task queued
+NEW 6483623248 (hotel ?, check-in 2026-07-23) — detail-fetch task queued
+NEW 5592941030 (hotel ?, check-in 2026-07-11) — detail-fetch task queued
+CANCELLED 6530398741 — no matching booking, flagged for review
+NEW 6449441662 (hotel ?, check-in 2026-06-19) — detail-fetch task queued
+CANCELLED 6973632071 — no matching booking, flagged for review
+NEW 5026092184 (hotel ?, check-in 2026-08-02) — detail-fetch task queued
+NEW 5026007594 (hotel ?, check-in 2026-06-19) — detail-fetch task queued
+NEW 6088437667 (hotel ?, check-in 2026-11-13) — detail-fetch task queued
+NEW 6130035015 (hotel ?, check-in 2026-07-18) — detail-fetch task queued
+NEW 5767500415 (hotel ?, check-in 2026-12-19) — detail-fetch task queued
+NEW 6770404415 (hotel ?, check-in 2026-07-24) — detail-fetch task queued
+NEW 5401819934 (hotel ?, check-in 2026-06-13) — detail-fetch task queued
+NEW 6941571500 (hotel ?, check-in 2026-09-07) — detail-fetch task queued
+NEW 6812610073 (hotel ?, check-in 2026-07-09) — detail-fetch task queued
+NEW 6781417811 (hotel ?, check-in 2026-06-22) — detail-fetch task queued
+NEW 5081547106 (hotel ?, check-in 2026-06-15) — detail-fetch task queued
+NEW 5314176582 (hotel ?, check-in 2026-07-16) — detail-fetch task queued
+NEW 5767551706 (hotel ?, check-in 2026-07-25) — detail-fetch task queued
+NEW 6781415675 (hotel ?, check-in 2026-07-10) — detail-fetch task queued
+NEW 5473280363 (hotel ?, check-in 2026-07-18) — detail-fetch task queued
+NEW 6770418892 (hotel ?, check-in 2026-07-23) — detail-fetch task queued
+NEW 6545269294 (hotel ?, check-in 2026-06-23) — detail-fetch task queued
+NEW 5444246956 (hotel ?, check-in 2026-12-29) — detail-fetch task queued
+NEW 6392968308 (hotel ?, check-in 2026-08-02) — detail-fetch task queued
+CANCELLED 6812610073 — no matching booking, flagged for review
+NEW 5043440804 (hotel ?, check-in 2026-06-28) — detail-fetch task queued
+NEW 6392998051 (hotel ?, check-in 2026-06-14) — detail-fetch task queued
+NEW 5767535837 (hotel ?, check-in 2026-08-27) — detail-fetch task queued
+NEW 5921886935 (hotel ?, check-in 2026-07-04) — detail-fetch task queued
+CANCELLED 5345652660 — no matching booking, flagged for review
+CANCELLED 5345652660 — no matching booking, flagged for review
+NEW 5043474466 (hotel ?, check-in 2026-10-09) — detail-fetch task queued
+MODIFIED 6392968308 (hotel ?, check-in 2026-08-13) — detail-fetch task queued
+NEW 5778715914 (hotel ?, check-in 2026-07-23) — detail-fetch task queued
+CANCELLED 6902265395 — no matching booking, flagged for review
+NEW 5591928297 (hotel ?, check-in 2026-07-12) — detail-fetch task queued
+NEW 5778717294 (hotel ?, check-in 2026-07-01) — detail-fetch task queued
+Processed 106 new emails: 0 cancellations handled (0 inventory jobs queued), 71 new/modified awaiting detail-fetch, 11 flagged for review, 24 ignored. Pending email tasks: 81.
+2026-06-13 02:29:51 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 81.
+2026-06-13 02:36:21 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 81.
+2026-06-13 04:02:07 IMAP error: read ETIMEDOUT
+=== 2026-06-13 05:02:07 email-watch: exit 1
+=== 2026-06-13 05:02:07 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AggregateError [ETIMEDOUT]: 
+    at internalConnectMultiple (node:net:1193:18)
+    at internalConnectMultiple (node:net:1269:5)
+    at Timeout.internalConnectMultipleTimeout (node:net:1810:5)
+    at listOnTimeout (node:internal/timers:607:11)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ETIMEDOUT',
+  [errors]: [
+    Error: connect ETIMEDOUT 192.178.223.108:993
+        at createConnectionError (node:net:1746:14)
+        at Timeout.internalConnectMultipleTimeout (node:net:1805:38)
+        at listOnTimeout (node:internal/timers:607:11)
+        at process.processTimers (node:internal/timers:541:7) {
+      errno: -60,
+      code: 'ETIMEDOUT',
+      syscall: 'connect',
+      address: '192.178.223.108',
+      port: 993
+    },
+    Error: connect ENETUNREACH 192.178.223.109:993 - Local (0.0.0.0:64089)
+        at internalConnectMultiple (node:net:1265:16)
+        at Timeout.internalConnectMultipleTimeout (node:net:1810:5)
+        at listOnTimeout (node:internal/timers:607:11)
+        at process.processTimers (node:internal/timers:541:7) {
+      errno: -51,
+      code: 'ENETUNREACH',
+      syscall: 'connect',
+      address: '192.178.223.109',
+      port: 993
+    }
+  ]
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:02:08 email-watch: exit 1
+=== 2026-06-13 05:03:08 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:04:23 email-watch: exit 1
+=== 2026-06-13 05:04:23 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:05:38 email-watch: exit 1
+=== 2026-06-13 05:05:38 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:06:54 email-watch: exit 1
+=== 2026-06-13 05:06:54 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:08:09 email-watch: exit 1
+=== 2026-06-13 05:08:09 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:09:24 email-watch: exit 1
+=== 2026-06-13 05:09:24 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:10:39 email-watch: exit 1
+=== 2026-06-13 05:10:39 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:11:55 email-watch: exit 1
+=== 2026-06-13 05:11:55 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: connect ETIMEDOUT 10.0.0.1:993
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+  errno: -60,
+  code: 'ETIMEDOUT',
+  syscall: 'connect',
+  address: '10.0.0.1',
+  port: 993
+}
+
+Node.js v26.3.0
+=== 2026-06-13 05:13:10 email-watch: exit 1
+=== 2026-06-13 05:13:10 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 04:13:12 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 04:13:12 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 81.
+2026-06-13 04:15:27 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 81.
+2026-06-13 05:14:06 IMAP connection closed
+=== 2026-06-13 06:14:06 email-watch: exit 1
+=== 2026-06-13 06:14:06 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 05:14:07 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 05:14:07 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 81.
+2026-06-13 05:35:23 new mail (IDLE) — running poller
+NEW 6770498117 (hotel ?, check-in 2026-08-21) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 82.
+2026-06-13 07:45:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 82.
+2026-06-13 08:10:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 82.
+2026-06-13 08:12:23 new mail (IDLE) — running poller
+NEW 5043404610 (hotel ?, check-in 2026-08-01) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 08:29:03 IMAP error: read ETIMEDOUT
+=== 2026-06-13 09:29:03 email-watch: exit 1
+=== 2026-06-13 09:29:03 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 08:29:11 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 08:29:11 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 08:31:34 IMAP error: read ETIMEDOUT
+=== 2026-06-13 09:31:34 email-watch: exit 1
+=== 2026-06-13 09:31:34 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: getaddrinfo ENOTFOUND imap.gmail.com
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'imap.gmail.com'
+}
+
+Node.js v26.3.0
+=== 2026-06-13 09:31:34 email-watch: exit 1
+=== 2026-06-13 09:32:34 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: getaddrinfo ENOTFOUND imap.gmail.com
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'imap.gmail.com'
+}
+
+Node.js v26.3.0
+=== 2026-06-13 09:33:04 email-watch: exit 1
+=== 2026-06-13 09:33:34 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 08:33:36 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 08:33:36 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 08:33:56 IMAP error: read ECONNRESET
+=== 2026-06-13 09:33:57 email-watch: exit 1
+=== 2026-06-13 09:34:35 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 08:34:37 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 08:34:37 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 08:37:25 IMAP error: read ETIMEDOUT
+=== 2026-06-13 09:37:25 email-watch: exit 1
+=== 2026-06-13 09:37:25 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 08:37:27 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 08:37:27 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 08:38:42 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 09:04:12 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 09:04:42 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 09:34:42 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 09:40:13 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 83.
+2026-06-13 09:48:12 new mail (IDLE) — running poller
+NEW 6941535935 (hotel ?, check-in 2026-09-08) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 84.
+2026-06-13 09:57:27 new mail (IDLE) — running poller
+NEW 5778767575 (hotel ?, check-in 2026-09-25) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 85.
+2026-06-13 10:02:42 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 85.
+=== 2026-06-13 11:04:36 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 10:04:40 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 10:04:40 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 85.
+2026-06-13 10:06:25 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 85.
+2026-06-13 10:06:57 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 85.
+2026-06-13 10:16:26 new mail (IDLE) — running poller
+NEW 5473267061 (hotel ?, check-in 2026-07-04) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 86.
+2026-06-13 10:26:56 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 86.
+2026-06-13 10:27:26 new mail (IDLE) — running poller
+MODIFIED 6282974564 (hotel ?, check-in 2026-07-03) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 87.
+2026-06-13 10:47:56 new mail (IDLE) — running poller
+CANCELLED 5043474466 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 88.
+2026-06-13 11:05:27 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 88.
+2026-06-13 11:27:26 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 88.
+2026-06-13 11:33:56 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 88.
+=== 2026-06-13 12:37:34 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-13 11:37:36 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-13 11:37:36 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 88.
+2026-06-13 11:52:41 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 88.
+2026-06-13 12:18:51 new mail (IDLE) — running poller
+NEW 6812662794 (hotel ?, check-in 2026-07-04) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 89.
+2026-06-13 12:45:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 89.
+2026-06-13 12:58:51 new mail (IDLE) — running poller
+CANCELLED 5989636328 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 90.
+2026-06-13 12:59:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 90.
+2026-06-13 13:03:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 90.
+2026-06-13 13:05:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 90.
+2026-06-13 13:07:22 new mail (IDLE) — running poller
+NEW 5401819307 (hotel ?, check-in 2026-07-18) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 91.
+2026-06-13 13:16:22 new mail (IDLE) — running poller
+CANCELLED 6134715633 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 92.
+2026-06-13 13:30:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 92.
+2026-06-13 13:33:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 92.
+2026-06-13 13:36:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 92.
+2026-06-13 13:44:26 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 92.
+2026-06-13 13:46:56 new mail (IDLE) — running poller
+NEW 6130093637 (hotel ?, check-in 2026-08-14) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 93.
+2026-06-13 13:52:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 93.
+2026-06-13 13:53:24 new mail (IDLE) — running poller
+NEW 5767507330 (hotel ?, check-in 2026-09-28) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 94.
+2026-06-13 13:56:24 new mail (IDLE) — running poller
+NEW 5767597209 (hotel ?, check-in 2026-08-01) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:39:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:40:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:41:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:44:24 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:51:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 14:52:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 15:27:36 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 15:40:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 15:42:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 15:54:26 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 16:01:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 16:04:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 95.
+2026-06-13 16:06:53 new mail (IDLE) — running poller
+NEW 5043414885 (hotel ?, check-in 2026-08-29) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 96.
+2026-06-13 16:08:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 96.
+2026-06-13 16:13:54 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 96.
+2026-06-13 16:38:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 96.
+2026-06-13 16:52:22 new mail (IDLE) — running poller
+CANCELLED 5401819934 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 97.
+2026-06-13 17:03:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 97.
+2026-06-13 17:20:22 new mail (IDLE) — running poller
+NEW 5386137948 (hotel ?, check-in 2026-09-11) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 98.
+2026-06-13 17:35:53 new mail (IDLE) — running poller
+NEW 6004957821 (hotel ?, check-in 2026-06-20) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 99.
+2026-06-13 17:47:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 99.
+2026-06-13 17:51:22 new mail (IDLE) — running poller
+NEW 6489453263 (hotel ?, check-in 2026-06-15) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 100.
+2026-06-13 18:00:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 100.
+2026-06-13 18:01:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 100.
+2026-06-13 18:04:56 new mail (IDLE) — running poller
+NEW 5988340954 (hotel ?, check-in 2026-07-04) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 101.
+2026-06-13 18:15:54 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 101.
+2026-06-13 18:18:52 new mail (IDLE) — running poller
+MODIFIED 6489453263 (hotel ?, check-in 2026-06-15) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 102.
+2026-06-13 18:22:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 102.
+2026-06-13 18:25:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 102.
+2026-06-13 18:39:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 102.
+2026-06-13 18:44:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 102.
+2026-06-13 18:56:27 new mail (IDLE) — running poller
+NEW 6978492030 (hotel ?, check-in 2026-07-20) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 18:59:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:36:54 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:39:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:47:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:49:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:50:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:51:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:54:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 19:55:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:02:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:07:37 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:30:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:32:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:34:26 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 103.
+2026-06-13 20:35:26 new mail (IDLE) — running poller
+CANCELLED 6541758399 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 104.
+2026-06-13 20:39:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 104.
+2026-06-13 21:04:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 104.
+2026-06-13 21:26:53 new mail (IDLE) — running poller
+NEW 5813111315 (hotel ?, check-in 2026-08-05) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 105.
+2026-06-13 21:35:23 new mail (IDLE) — running poller
+NEW 5452111347 (hotel ?, check-in 2026-06-16) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 106.
+2026-06-13 21:37:37 new mail (IDLE) — running poller
+CANCELLED 5813111315 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 107.
+2026-06-13 21:47:22 new mail (IDLE) — running poller
+NEW 6004951697 (hotel ?, check-in 2026-06-28) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 21:52:38 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 21:54:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 21:55:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 21:55:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 22:52:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 108.
+2026-06-13 23:02:22 new mail (IDLE) — running poller
+CANCELLED 6219216900 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 109.
+2026-06-14 02:06:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 109.
+2026-06-14 02:19:52 new mail (IDLE) — running poller
+NEW 6889910053 (hotel ?, check-in 2026-06-17) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 110.
+2026-06-14 03:27:38 IMAP error: read ECONNRESET
+=== 2026-06-14 04:27:38 email-watch: exit 1
+=== 2026-06-14 04:27:38 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-14 03:27:39 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-14 03:27:39 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 05:41:55 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 06:39:10 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 06:49:40 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 07:14:10 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 07:50:25 IMAP error: read ECONNRESET
+=== 2026-06-14 08:50:25 email-watch: exit 1
+=== 2026-06-14 08:50:25 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-14 07:50:27 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-14 07:50:27 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 111.
+2026-06-14 09:15:15 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 112.
+2026-06-14 09:58:14 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 112.
+2026-06-14 10:08:14 new mail (IDLE) — running poller
+NEW 6004902844 (hotel ?, check-in 2026-07-21) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 113.
+2026-06-14 12:39:15 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 113.
+=== 2026-06-14 13:49:14 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-14 12:49:15 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-14 12:49:15 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 113.
+=== 2026-06-14 14:07:35 email-watch: node /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/db/watch-booking-emails.mjs
+2026-06-14 13:07:37 watching INBOX via IMAP IDLE (instant booking-email reaction)
+2026-06-14 13:07:37 new mail (startup) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 113.
+2026-06-14 13:12:22 new mail (IDLE) — running poller
+NEW 5850244528 (hotel ?, check-in 2026-07-13) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 114.
+2026-06-14 13:14:52 new mail (IDLE) — running poller
+NEW 6595548479 (hotel ?, check-in 2026-08-07) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 115.
+2026-06-14 13:31:22 new mail (IDLE) — running poller
+NEW 5611044996 (hotel ?, check-in 2026-08-07) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:34:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:36:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:37:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:45:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:48:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 13:49:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 116.
+2026-06-14 14:38:22 new mail (IDLE) — running poller
+CANCELLED 5026092184 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 117.
+2026-06-14 15:05:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 117.
+2026-06-14 15:21:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 117.
+2026-06-14 15:53:22 new mail (IDLE) — running poller
+NEW 5123723959 (hotel ?, check-in 2026-07-14) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 118.
+2026-06-14 16:07:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 118.
+2026-06-14 16:08:52 new mail (IDLE) — running poller
+NEW 5231193939 (hotel ?, check-in 2026-08-12) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 119.
+2026-06-14 16:09:22 new mail (IDLE) — running poller
+NEW 5123776681 (hotel ?, check-in 2026-06-16) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 120.
+2026-06-14 16:13:52 new mail (IDLE) — running poller
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 1 ignored. Pending email tasks: 120.
+2026-06-14 16:15:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 120.
+2026-06-14 16:45:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 120.
+2026-06-14 16:46:22 new mail (IDLE) — running poller
+NEW 6595500443 (hotel ?, check-in 2026-06-26) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 121.
+2026-06-14 16:53:23 new mail (IDLE) — running poller
+NEW 6595511234 (hotel ?, check-in 2026-09-01) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 122.
+2026-06-14 16:59:22 new mail (IDLE) — running poller
+NEW 5808399918 (hotel ?, check-in 2026-07-30) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 123.
+2026-06-14 17:02:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 123.
+2026-06-14 17:15:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 123.
+2026-06-14 17:16:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 123.
+2026-06-14 17:30:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 123.
+2026-06-14 17:43:22 new mail (IDLE) — running poller
+NEW 6091829476 (hotel ?, check-in 2026-10-08) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 124.
+2026-06-14 18:18:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 124.
+2026-06-14 18:33:53 new mail (IDLE) — running poller
+NEW 6004974692 (hotel ?, check-in 2026-08-13) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 125.
+2026-06-14 18:39:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 125.
+2026-06-14 18:59:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 125.
+2026-06-14 19:06:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 125.
+2026-06-14 19:49:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 125.
+2026-06-14 19:54:23 new mail (IDLE) — running poller
+CANCELLED 5043414885 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 126.
+2026-06-14 19:56:23 new mail (IDLE) — running poller
+NEW 5769655299 (hotel ?, check-in 2026-10-09) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 19:57:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 19:57:52 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 19:58:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:10:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:12:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:15:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:44:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:57:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 127.
+2026-06-14 20:59:22 new mail (IDLE) — running poller
+CANCELLED 6008857817 — no matching booking, flagged for review
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 1 flagged for review, 0 ignored. Pending email tasks: 128.
+2026-06-14 21:07:22 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 128.
+2026-06-14 21:36:53 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 128.
+2026-06-14 21:41:23 new mail (IDLE) — running poller
+NEW 6595567744 (hotel ?, check-in 2026-07-28) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 129.
+2026-06-14 21:46:23 new mail (IDLE) — running poller
+NEW 6091824094 (hotel ?, check-in 2026-10-03) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 130.
+2026-06-14 21:47:37 new mail (IDLE) — running poller
+NEW 6189407676 (hotel ?, check-in 2026-10-22) — detail-fetch task queued
+Processed 2 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 1 ignored. Pending email tasks: 131.
+2026-06-14 21:54:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 131.
+2026-06-14 22:02:23 new mail (IDLE) — running poller
+NEW 6303180453 (hotel ?, check-in 2026-10-11) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 132.
+2026-06-14 22:47:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 132.
+2026-06-14 22:52:23 new mail (IDLE) — running poller
+NEW 5850275699 (hotel ?, check-in 2026-06-20) — detail-fetch task queued
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 1 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 133.
+2026-06-14 22:57:23 new mail (IDLE) — running poller
+Processed 0 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 0 ignored. Pending email tasks: 133.
+2026-06-14 23:57:53 new mail (IDLE) — running poller
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 1 ignored. Pending email tasks: 133.
+2026-06-14 23:58:53 new mail (IDLE) — running poller
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 1 ignored. Pending email tasks: 133.
+2026-06-15 00:21:23 new mail (IDLE) — running poller
+Processed 1 new emails: 0 cancellations handled (0 inventory jobs queued), 0 new/modified awaiting detail-fetch, 0 flagged for review, 1 ignored. Pending email tasks: 133.

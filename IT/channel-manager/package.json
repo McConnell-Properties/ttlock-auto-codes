@@ -1,0 +1,30 @@
+{
+  "name": "channel-manager",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "db:setup": "node db/init.mjs && node db/seed.mjs",
+    "db:seed": "node db/seed.mjs",
+    "db:backup": "node db/backup.mjs",
+    "rates:pull": "node db/pull-rates.mjs",
+    "inventory:queue": "node db/queue-inventory.mjs",
+    "stripe:sync": "node db/stripe-sync.mjs",
+    "emails:poll": "node db/poll-booking-emails.mjs"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.8.1",
+    "imapflow": "^1.0.164",
+    "next": "14.2.28",
+    "nodemailer": "^6.9.16",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.0",
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}

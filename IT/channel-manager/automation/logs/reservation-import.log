@@ -1,0 +1,28 @@
+=== 2026-06-13 13:01:30 reservation-import: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/reservation-import.sh
+parsed 454 records
+imported 382 confirmed (+84 cancelled for history), 19 unallocated, 0 skipped, 76 had missing status
+
+COVERAGE DIFF — 5 future Streatham stays were in the old sheet but NOT in this file:
+ - Room 11: 2026-07-01 → 2026-07-04
+ - Room 8: 2026-07-03 → 2026-07-04
+ - Room 7: 2026-07-05 → 2026-07-12
+ - Room 2: 2026-07-06 → 2026-07-10
+ - Room 3: 2026-07-06 → 2026-07-10
+=== 2026-06-13 13:01:59 reservation-import: exit 0
+=== 2026-06-13 15:40:00 reservation-import: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/reservation-import.sh
+source unchanged (/Users/charliemcconnell/Documents/Career/McConnell Enterprises/IT/ttlock-auto-codes/automation-data/reservation_status.csv) — skipping
+=== 2026-06-13 15:40:00 reservation-import: exit 0
+=== 2026-06-13 16:27:46 reservation-import: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/reservation-import.sh
+parsed 472 records
+imported 400 confirmed (+84 cancelled for history), 22 unallocated, 0 skipped, 76 had missing status
+
+COVERAGE DIFF — 5 future Streatham stays were in the old sheet but NOT in this file:
+ - Room 11: 2026-07-01 → 2026-07-04
+ - Room 8: 2026-07-03 → 2026-07-04
+ - Room 7: 2026-07-05 → 2026-07-12
+ - Room 2: 2026-07-06 → 2026-07-10
+ - Room 3: 2026-07-06 → 2026-07-10
+=== 2026-06-13 16:28:15 reservation-import: exit 0
+=== 2026-06-14 15:40:04 reservation-import: /bin/bash /Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/reservation-import.sh
+source unchanged (/Users/charliemcconnell/Documents/Career/McConnell Enterprises/IT/ttlock-auto-codes/automation-data/reservation_status.csv) — skipping
+=== 2026-06-14 15:40:04 reservation-import: exit 0
