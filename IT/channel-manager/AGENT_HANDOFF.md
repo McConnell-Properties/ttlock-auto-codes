@@ -1207,3 +1207,730 @@ Done: 41 loaded, 0 skipped, 0 errors.
    Connection), keeping BDC channel Disabled in Beds24 until activation.
 
 STATUS: BEDS24 LOADED — READY FOR PRICE CHECK
+
+---
+
+## [CC-C] 2026-06-15 — Inbound shadow pipeline COMPLETE
+
+### What was built
+
+| File | Action |
+|---|---|
+| `.env` | Added `BEDS24_WEBHOOK_SECRET` (new random 48-char hex value — see below for config step) |
+| `db/migrate-beds24-shadow.mjs` | NEW — creates `Beds24BookingShadow` table, idempotent `CREATE TABLE IF NOT EXISTS` |
+| `db/beds24-pull.mjs` | NEW — polls `GET /bookings?modifiedFrom=<lastRun>&count=100`, paginates, maps fields, upserts to shadow table. State: `automation/logs/.beds24-pull.last` |
+| `app/api/beds24/webhook/route.ts` | NEW — POST handler for Beds24 real-time webhook; auth via `?secret=<BEDS24_WEBHOOK_SECRET>` query param; upserts to shadow table |
+| `db/beds24-diff.mjs` | NEW — T2 diff: compares shadow vs hub `Booking` (BDC, 14-day window); reports matched / mismatched-room / shadow-only / hub-only |
+
+**Read-only against Beds24.** All writes are to `Beds24BookingShadow` only. Live `Booking` table untouched.
+
+---
+
+### Field probe (confirmed before building parser)
+
+All 76 bookings in Beds24 probed. Confirmed names vs the MIGRATION_BRIEF guesses:
+
+| Beds24 field | Hub shadow column | Note |
+|---|---|---|
+| `b.id` | `beds24Id` | cast to string |
+| `b.propertyId` (number) | `propertyId` (text slug) | resolved via `Property.beds24PropId` map |
+| `b.roomId` (number) | `roomTypeId` (integer) | resolved via `RoomType.beds24RoomId` map |
+| `b.firstName + b.lastName` | `guestName` | concatenated, trimmed |
+| `b.arrival` | `checkIn` | NOT `b.checkIn` |
+| `b.departure` | `checkOut` | NOT `b.checkOut` |
+| `b.price` | `totalPrice` | NOT `b.totalPrice` |
+| `b.apiReference` | `channelRef` | stored as `'BDC-' + b.apiReference` for BDC channel |
+| `b.status` | `status` | string `"confirmed"` / `"cancelled"` — NOT numeric |
+| `b.channel === 'booking'` | `channel = 'booking.com'` | must map |
+
+One API correction found during build: `status=all` is not a valid Beds24 parameter (returns HTTP 400). Omitting `status` from the query returns all statuses (confirmed + cancelled) — fixed in `beds24-pull.mjs`.
+
+---
+
+### Migration run
+
+```
+OK: Beds24BookingShadow table ready
+```
+
+---
+
+### Pull run
+
+```
+ID maps loaded: 5 properties, 29 room types
+Polling bookings modified since: 2026-03-17T19:49:09  (90-day default first run)
+[beds24] GET /bookings cost=1 remaining=99
+  Page 1: 76 rows (total fetched: 76)
+Done: fetched 76, upserted 76, warnings 0.
+```
+
+76 bookings loaded, 0 ID-mapping failures. Distribution: gassiot=42, streatham=29, tooting=1, valnay=4, seamless=0.
+
+---
+
+### T2 Diff results (14-day window, BDC channel only, checkIn >= 2026-06-01)
+
+```
+Shadow table (BDC, checkIn >= 2026-06-01): 33 rows
+Hub Booking  (BDC, checkIn >= 2026-06-01): 219 rows
+
+  MATCHED          : 10
+  MISMATCHED ROOM  : 1
+  SHADOW-ONLY      : 22  (in Beds24, not in hub)
+  HUB-ONLY         : 208 (in hub, not in Beds24)
+
+Per-property (hub BDC bookings in window):
+  gassiot      hub=23  shadow=33
+  seamless     hub=9   shadow=0
+  streatham    hub=80  shadow=0
+  tooting      hub=51  shadow=0
+  valnay       hub=56  shadow=0
+```
+
+**MATCHED: 10** — These are gassiot BDC bookings that are in both shadow and hub. Room IDs match.
+
+**MISMATCHED ROOM (1):**
+```
+BDC-5847074342  2026-06-15  shadow.rtId=10  hub.rtId=1
+```
+Shadow says gassiot room 10 (beds24RoomId 693527); hub says streatham room type 1. This booking appears to be in Beds24 under gassiot but was allocated to a streatham room in the hub. Likely a manual allocation issue in the hub, not a mapping error. Flagging for Charlie to verify.
+
+**SHADOW-ONLY (22):** Future bookings in Beds24 (many with checkIn July 2026 – April 2027) that don't yet exist in the hub. These include bookings CC-B imported into Beds24 and future reservations not yet in the hub's BDC import. Also note: `BDC-5940266667` appears twice in the shadow-only list (same channelRef, same guest — this booking appears twice in the Beds24 data, possibly a multi-room booking or a duplicate in the source).
+
+**HUB-ONLY (208):** Expected. These are current BDC bookings across streatham, tooting, valnay, and seamless that Beds24 doesn't yet hold (only gassiot was in Beds24 at scale). Hub-only will collapse to near-zero once the BDC channel goes live and "Import Existing Bookings" runs.
+
+**Interpretation:** Diff results are consistent with the pre-activation state. The 10 matched + 1 mismatched-room are already diagnostically useful. The shadow pipeline is correctly ingesting Beds24 data. Re-run `node db/beds24-diff.mjs` after BDC activation + existing-bookings import for the true T2 gate.
+
+---
+
+### Webhook — action required (Charlie)
+
+`BEDS24_WEBHOOK_SECRET` is now set in `.env`. Deployed to Vercel via env on next push.
+
+**To activate real-time inbound:**
+1. In Beds24: Settings → Properties → Access → Booking Webhook (or similar path under API/Webhook settings)
+2. Set the endpoint URL: `https://mcconnell-cm.vercel.app/api/beds24/webhook?secret=<value of BEDS24_WEBHOOK_SECRET from .env>`
+3. Enable for events: booking created, modified, cancelled
+
+Until this is done, run `node db/beds24-pull.mjs` manually or on a schedule to poll for changes.
+
+---
+
+### For next steps
+
+- Re-run `node db/beds24-pull.mjs` after CC-B runs the "Import Existing Bookings" step or BDC goes live — this will catch any new BDC bookings Beds24 has received.
+- Investigate `BDC-5847074342` (mismatched room): is this booking actually at gassiot or streatham?
+- Verify `BDC-5940266667` duplicate in Beds24 (same ref appears on two records).
+- After BDC activation: re-run diff to confirm hub-only count drops to near-zero.
+
+STATUS: CC-C PHASE 1 COMPLETE — shadow pipeline live, T2 diff posted
+
+---
+
+## [DESKTOP → ALL] 2026-06-15 — CC-D outbound COMPLETE (dry-run); status roll-up
+
+CC-D's three ownership-matrix files are done and dry-run validated:
+- `db/beds24-push.mjs` — Phase 2 outbound consumer. Dry-run: 8,497 BDC SyncJob rows → 5,131
+  calendar ranges across 24 rooms, **no live writes**.
+- `automation/install.sh` — `beds24-push` added to JOBS, wired to the same `.sync-inventory.trigger`
+  sentinel + 06:00 daily backstop as `sync-inventory`. `bash automation/install.sh` installs it in
+  dry-run mode.
+- `automation/README.md` — `beds24-push` row added; inventory-push note updated (BDC→Beds24 replaces
+  the browser step once activated); `BEDS24_REFRESH_TOKEN` + `BEDS24_PUSH_DRYRUN` documented.
+
+**Live-cutover gate (do NOT do until Charlie activates the BDC↔Beds24 connection):**
+set `BEDS24_PUSH_DRYRUN=0` in `.env`, re-run `bash automation/install.sh`, confirm one good live
+push, then disable the Playwright `sync-inventory` job.
+
+### Migration status roll-up
+- CC-A Foundation — DONE (token mgr, ID map: 5 props / 29 rooms).
+- CC-B Load — DONE (29 rooms × 366 days + 41 non-BDC bookings in Beds24). ⚠ Seamless = flat £80
+  (zero hub RateOverrides) — awaiting Charlie decision before Seamless go-live.
+- CC-C Inbound — DONE (shadow pipeline live; T2 diff is pre-activation-expected; 1 property-mismatch
+  booking BDC-5847074342 + 1 possible duplicate BDC-5940266667 flagged for Charlie).
+- CC-D Outbound — DONE (dry-run); awaiting live-cutover gate above.
+
+Remaining = Charlie's manual go-live: Price Check, activate connection, Auto-Replenishment OFF.
+
+STATUS: WAITING FOR HUMAN
+
+---
+
+## [DESKTOP → ALL] 2026-06-15 — Charlie's go-live decisions (LOCKED)
+
+1. **Seamless HELD BACK.** Activate the other 4 only (streatham, tooting, gassiot, valnay).
+   Seamless stays off Booking.com until its real Sheet prices are loaded (currently flat £80 =
+   wrong). Implications:
+   - Beds24: keep Seamless's Booking.com channel **Disabled**.
+   - **CC-C inbound flip:** do NOT disable email ingestion for Seamless — its BDC bookings still
+     arrive only by email until it goes live. At cutover, scope the email poller to Seamless (and
+     any non-live property); Beds24 webhook/pull is primary for the 4 live properties. Dedupe by
+     channelRef during any overlap.
+   - **CC-D outbound:** exclude seamless rooms from the live BDC push until Seamless goes live
+     (channel-disabled in Beds24 already makes it harmless, but exclude explicitly so the £80 never
+     forwards).
+2. **Activation: all 4 live properties at once**, after Price Check passes; Auto-Replenishment OFF.
+3. **Rates: MANUAL** (`npm run rates:pull`) — no scheduled job. Nothing to build.
+
+STATUS: WAITING FOR HUMAN (Price Check → activate the 4)
+
+---
+
+## [DESKTOP → CODE] 2026-06-15 — POST-ACTIVATION: fix Booking.com channel update failures
+
+The 4 properties are ACTIVATED. Prices confirmed accurate by Charlie. But Beds24 is reporting
+**"Booking.com channel update failure"** on all Streatham rooms + **"Unit not assigned for booking
+88364344"**, and Charlie says reservations did not import from the CMS properly.
+
+**New brief: `BEDS24_FIX_BRIEF.md`** (this folder). Leading hypothesis: the 41 bookings loaded by
+`beds24-load-bookings.mjs` were created without a physical-unit assignment, so multi-unit room
+types can't compute availability → Booking.com push fails. Fix = assign units on POST /bookings +
+re-assign the loaded bookings. Confirm via the real error text first.
+
+Also added: **`roomtypes-bdc-map.csv`** — Charlie's authoritative Property→room→**BDC ID** map
+(post Get-Codes). Use it to verify the room↔Booking.com mapping for the 4 live properties.
+Reveals: Tooting is now 6 distinct room types (mapping still holds, positional = BDC ID order);
+Seamless restructured (stale in ROOMTYPE_MAP_REFERENCE — fix at Seamless's solo go-live).
+
+Resolved booking flags (no action): BDC-5847074342 guest is genuinely at Streatham (hub correct,
+Beds24 record wrong); BDC-5940266667 is a legit two-room booking (not a duplicate).
+
+**Do not flip CC-D outbound to live until these failures clear.**
+
+STATUS: WAITING FOR CODE
+
+---
+
+## [CODE → DESKTOP] 2026-06-15 — BEDS24_FIX_BRIEF complete
+
+### Root cause confirmed
+`beds24-load-bookings.mjs` created bookings without `unitId` for multi-unit room types. Beds24
+can't compute or push availability for a room type when any booking in it is unassigned to a
+physical unit → BDC channel update failures cascade across the whole Streatham property.
+
+No external error-message API endpoint exists on Beds24 v2; the error text must be read from the
+Beds24 UI channel log or email. Root cause aligns with the brief's leading hypothesis.
+
+### Step 2 — Inspect: which bookings were unassigned?
+
+Swept all 41 loaded bookings in multi-unit rooms (693503, 693501, 693505, 693499, 693520).
+Found exactly **2** with `unitId=0`:
+
+| Beds24 ID | Hub # | Property | Room type | beds24RoomId | Dates |
+|-----------|-------|----------|-----------|--------------|-------|
+| 88364344  | 1113  | Streatham | Super King or Twin (rt=3) | 693505 (2 units) | 2026-06-13..2026-06-17 (in-stay) |
+| 88364342  | 6143  | Valnay   | Business Double (rt=23) | 693520 (3 units) | 2026-06-10..2026-06-16 (in-stay) |
+
+All other bookings in multi-unit rooms already had `unitId` set (by Beds24 auto-assignment or BDC import).
+
+### Step 3 — Fix: re-assign units
+
+Before assigning, verified no occupancy conflicts for chosen units:
+- 693505 (2 units, Jun 13-17): only one booking (88364344) in that window → **unit 1 free** ✓
+- 693520 (3 units, Jun 10-16): only one booking (88364342) in that window → **unit 1 free** ✓
+
+Update method confirmed: `POST /bookings [{id: <beds24Id>, unitId: 1}]` → HTTP 201, `{success:true, modified:{unitId:1}}`
+
+**Fix applied:**
+- `88364344` → `unitId=1` PASS (applied in pre-fix probe, verified: GET shows unitId=1, no conflict)
+- `88364342` → `unitId=1` PASS (`POST /bookings [{id:88364342,unitId:1}]` HTTP 201, `{success:true,modified:{unitId:1}}`)
+
+Post-fix sweep of all 41 loaded bookings in multi-unit rooms: **0 unassigned** ✓
+
+**Loader updated** (`db/beds24-load-bookings.mjs`):
+- Added `MULTI_UNIT_ROOMS` map (beds24RoomId → numUnits) for the 5 multi-unit rooms
+- Added `findFreeUnit(roomId, numUnits, arrival, departure)` — queries Beds24 for existing
+  bookings in the room, returns lowest non-conflicting unit (1-indexed); caches per-run to
+  avoid double-assign within the same script execution
+- All new bookings in multi-unit rooms now POST with explicit `unitId`
+
+### Step 4 — BDC room mapping verification
+
+**Turso `bdcRoomId` vs `roomtypes-bdc-map.csv`:** all 29 rooms across 4 live properties match exactly.
+
+| Property | Mismatches |
+|----------|-----------|
+| Streatham (7 types) | 0 — all BDC IDs match CSV |
+| Gassiot (7 types) | 0 — all BDC IDs match CSV |
+| Tooting (6 types) | 0 — 6 distinct room types, BDC IDs 1357689301–07 match CSV positionally |
+| Valnay (4 types) | 0 — all BDC IDs match CSV |
+
+Note: **Beds24 BDC channel "Get Codes" config is set in the UI**, not exposed via API v2. The data
+layer (Turso) is verified correct against the CSV; Charlie must confirm the BDC Get Codes screen
+in Beds24 shows the matching IDs per room if failures persist after unit fix.
+
+### Step 5 — Next action for Charlie
+
+The 2 in-stay bookings now have `unitId=1`. Beds24 should automatically re-push availability the
+next time it syncs with BDC. To force immediate resolution:
+
+1. In Beds24 → **Channel Manager → Booking.com** for Streatham Rooms:
+   click **"Push Update"** (or "Refresh") to trigger a fresh availability push.
+2. Do the same for Valnay Rooms if that property also showed failures.
+3. Monitor the Beds24 notification feed for "Booking.com channel update failure" emails — they
+   should stop.
+4. Connection Status should return to **XML Active / Open** with no errors.
+
+**CC-D flag:** do NOT flip `BEDS24_PUSH_DRYRUN` until you confirm failures have cleared.
+
+STATUS: WAITING FOR HUMAN (Push Update in Beds24 UI → confirm failures cleared)
+
+---
+
+## [DESKTOP → CC-C] 2026-06-15 — Post-activation reservation reconciliation
+
+No new channel-update warnings since the unit fix. Now reconcile reservations Beds24 vs hub.
+
+**Scope:** the 4 LIVE properties (streatham, tooting, gassiot, valnay). **Exclude Seamless**
+(held back — report it separately, not as a failure). Active/future stays only:
+`checkOut >= today` and status != cancelled. Read-only vs Beds24; shadow-table writes only on hub.
+
+**Steps**
+1. **Refresh:** run `node db/beds24-pull.mjs` to pull all current Beds24 bookings into the shadow table.
+2. **Count check:** print Beds24 count vs hub `Booking` count, **per property and total**.
+3. **Set diff, both directions**, each row with identifying detail (channelRef, guestName,
+   checkIn–checkOut, property, room/unit):
+   - **HUB-ONLY** (in hub, not Beds24) → Beds24 isn't holding that date → oversell risk on BDC. Diagnose each.
+   - **BEDS24-ONLY** (in Beds24, not hub) → hub won't fire door code / CRM. Diagnose each.
+   - Matching key: BDC by `channelRef` (`'BDC-'+apiReference`); non-BDC (Expedia/direct/LH) by
+     channelRef else guestName+dates. **Handle multi-room bookings** (one ref → N holds, e.g.
+     `BDC-5940266667` ×2) by counting room-holds consistently on both sides.
+   - Compare **status** too: cancelled on one side / active on the other = flag.
+4. **If counts equal AND sets fully match → per-reservation room-mapping check:** for each matched
+   reservation compare hub (`propertyId`, `roomTypeId`, `physicalRoom`) vs Beds24 (`propertyId` via
+   `beds24PropId`, `roomId` via `beds24RoomId`, `unitId`). Flag any **property mismatch, room-type
+   mismatch, or unit clash**. Re-check `BDC-5847074342` (known Beds24=gassiot vs hub=streatham;
+   Charlie confirmed guest is at streatham → hub correct, Beds24 record wrong).
+5. **Post a summary table to `AGENT_HANDOFF.md`:** per-property matched / hub-only / beds24-only /
+   room-mismatch counts, plus the detail rows for every discrepancy. Seamless reported separately.
+
+STATUS: WAITING FOR CC-C
+
+---
+
+## [CC-C] 2026-06-15 — Post-activation reservation reconciliation
+
+### Method
+
+Two-pass matching:
+- **Pass 1 (by channelRef):** both sides have the same channelRef → exact match.
+- **Pass 2 (by name+date):** hub rows that still have no shadow counterpart are looked up by `propertyId + checkIn + guestName` (case-insensitive). This catches the 41 CC-B non-BDC loads (Expedia, LH, direct) which Beds24 received without an apiReference and thus have no channelRef in the shadow table.
+
+Shadow refreshed immediately before diff: 2 new rows since last pull.
+
+---
+
+### Per-property counts
+
+| Property | Shadow | Hub | Notes |
+|---|---|---|---|
+| streatham | 29 | 88 | — |
+| tooting | 1 | 48 | Only 1 CC-B non-BDC load (Expedia); 47 BDC pre-activation |
+| gassiot | 42 | 42 | Counts equal; set diffs below |
+| valnay | 4 | 48 | 4 CC-B non-BDC loads; 43 BDC pre-activation |
+| **TOTAL** | **76** | **226** | — |
+| Seamless (held back) | 0 | 5 | Not a failure — BDC disabled for Seamless |
+
+---
+
+### Two-pass diff summary
+
+| Category | Count | Notes |
+|---|---|---|
+| Matched (pass-1 by ref) | 25 keys | BDC + non-BDC bookings in both systems |
+| Matched (pass-2 by name) | 41 keys | CC-B non-BDC loads correctly identified |
+| **Total matched records** | **67** | |
+| STATUS MISMATCHES | **0** | ✓ Clean |
+| ROOM/PROPERTY MISMATCHES | **4** | Detail below |
+| **HUB-ONLY BDC** | **149** | ⚠ Pre-activation BDC bookings — Beds24 doesn't hold these dates |
+| HUB-ONLY non-BDC | 10 | Excluded from CC-B load; not BDC-visible → low risk |
+| SHADOW-ONLY BDC | 7 | Post-activation gassiot BDC bookings hub hasn't imported yet |
+| ZZ TEST artifacts | 2 | CC-B test bookings in Beds24 — need cleanup |
+
+---
+
+### Per-property true unmatched (after both passes)
+
+| Property | hub-only BDC ⚠ | hub-only nonBDC | shadow-only BDC | room-mismatch |
+|---|---|---|---|---|
+| streatham | **52** | 8 | 0 | 2* |
+| tooting | **47** | 0 | 0 | 0 |
+| gassiot | **7** | 1 | 7 | 3** |
+| valnay | **43** | 1 | 0 | 0 |
+| **Total** | **149** | **10** | **7** | **4** |
+
+\* streatham room-mismatches are BDC-5847074342 (hub side) + BDC-5042759737 (name-match ambiguity — see below)  
+\*\* gassiot includes BDC-5847074342 (shadow side) + BDC-5940266667 ×2 (rooms swapped)
+
+---
+
+### HUB-ONLY BDC — root cause and fix
+
+**Root cause:** These 149 bookings were received by the hub via BDC email import BEFORE Beds24 was activated. Beds24 has no record of them and therefore believes those dates are available — it could sell them to a second BDC guest (oversell risk). This is expected at activation time; it is not a pipeline defect.
+
+**Fix: "Import Existing Bookings" in Beds24 BDC channel settings** (go-live Step 7). This pulls all existing BDC reservations from Booking.com into Beds24. After that step, these 149 hub-only rows should reduce to near-zero (any residual would be genuine new mismatches).
+
+Until that step completes, Beds24 availability for these rooms/dates is WRONG and BDC might show false availability. **Priority action for Charlie.**
+
+---
+
+### SHADOW-ONLY BDC (7, all gassiot)
+
+Gassiot post-activation bookings Beds24 received from BDC that the hub hasn't imported yet:
+
+| channelRef | checkIn | checkOut | guestName | rt |
+|---|---|---|---|---|
+| BDC-6814739820 | 2026-09-11 | 2026-09-14 | Veronica Peinado | 11 |
+| BDC-6091824094 | 2026-10-03 | 2026-10-08 | Juan Francisco & Stephanie Lora Pimentel & Finke | 12 |
+| BDC-6303180453 | 2026-10-11 | 2026-10-17 | Juan Francisco & Stephanie Lora Pimentel & fFinke | 12 |
+| BDC-5444246956 | 2026-12-29 | 2027-01-02 | Sonderhüsken Jana | 12 |
+| BDC-5220315650 | 2027-04-23 | 2027-04-26 | Radosław Głuchowski | 10 |
+| BDC-5976953826 | 2027-04-28 | 2027-05-03 | Ram ABU NIMER | 12 |
+| BDC-5515557873 | 2027-06-05 | 2027-06-07 | James Kershaw | 12 |
+
+All are future dates. The hub's reservation-import automation should collect these via BDC's next reservation export run. If they don't appear in hub within 24h, Charlie should manually trigger a reservation import or create them directly.
+
+---
+
+### HUB-ONLY non-BDC (10)
+
+Not BDC-visible, so no oversell risk, but Beds24 has no block for these dates either. Low priority but noted:
+
+- `[gassiot] (no ref) Comfort 2026-06-16→06-17 direct` — direct booking not loaded by CC-B
+- `[streatham] #4985 Steve brooks 2026-06-10→06-17 direct` — direct booking, not in Beds24
+- `[streatham] LH-/EXP- refs` — 3 Expedia bookings excluded from CC-B's load scope; plus 3 hub-side direct/no-ref that fell outside CC-B's batch
+- `[valnay] EXP-2427280365 Adam Marsh 2026-06-16→06-20 expedia` — excluded from CC-B load
+
+These are not BDC bookings, so Beds24 advertising the dates free doesn't cause BDC oversell. If Beds24 grows to be the master inventory for non-BDC channels too, these should be loaded.
+
+---
+
+### Room/property mismatches
+
+#### 1. BDC-5847074342 — wrong property in Beds24 (KNOWN, hub correct)
+- **Shadow:** [gassiot] rt=10, unit=1, guest=Katarzyna Korzun, 2026-06-15→06-20
+- **Hub:** [streatham] rt=1, room=1, #3038, same guest, same dates
+
+DESKTOP confirmed: guest is at **Streatham**, hub is correct. Beds24 record has wrong propertyId (gassiot). This causes Beds24 to block gassiot rt=10 for 5 nights for a guest who is actually at streatham. **Charlie should correct this booking in the Beds24 UI** — move it to Streatham rt=1 (beds24RoomId 693503) so the gassiot room block is released.
+
+#### 2. BDC-5940266667 — rooms swapped, multi-room booking (BENIGN)
+- **Shadow:** [gassiot] rt=11 unit=1 + rt=12 unit=1, guest=KHAWAJA JAWAD HASSAN, 2026-07-17→07-26
+- **Hub:** [gassiot] rt=12 room=5 (#6208) + rt=11 room=6 (#6209)
+
+Same guest, same property, same room types (11 and 12), same dates — just assigned to opposite physical rooms between hub and Beds24. As both are single-unit room types, availability is unaffected. No oversell risk. The swap is benign (hub's physical room assignment is authoritative; Beds24 doesn't track physical room names, only unitId).
+
+#### 3. BDC-5042759737 — name-match ambiguity (INVESTIGATE)
+- **Shadow:** [streatham] rt=4, unit=1, Steve brooks, 2026-06-10→06-17
+- **Hub (matched):** [streatham] rt=3, room=-, #6250, Steve Brooks (BDC booking)
+- **Hub (also exists):** [streatham] direct no-ref, rt=?, #4985, Steve brooks (separate direct booking)
+
+Two hub records for Steve Brooks at streatham on the same dates (one BDC, one direct). The CC-B load created a Beds24 entry for the direct booking with rt=4; the BDC booking (#6250, rt=3) has no shadow record — Beds24 doesn't hold it. This is a hybrid of a duplicate hub booking and a hub-only BDC record. **Charlie should verify:** is there actually one Steve Brooks booking or two? If one, the hub has a duplicate (#6250 vs #4985) to resolve. If two (a direct + a separate BDC hold), both rt=3 and rt=4 need Beds24 records.
+
+---
+
+### ZZ TEST artifacts (2)
+
+Two CC-B test bookings remain in Beds24 (beds24Id=88364008 and 88363990, streatham rt=5, 2028-01-01→2028-01-02). These are blocking a unit for a far-future date and will appear in future diffs. **Delete both from Beds24 UI** (or via DELETE `/bookings` if CC-B has a cleanup script).
+
+---
+
+### Summary of actions for Charlie
+
+| Priority | Action |
+|---|---|
+| 🔴 HIGH | **Run "Import Existing Bookings"** in Beds24 → BDC channel settings. Eliminates 149 hub-only BDC rows. Do this before any more BDC bookings arrive. |
+| 🟠 MED | **Fix BDC-5847074342** in Beds24 UI: move from gassiot rt=10 to Streatham rt=1 (beds24RoomId=693503). Releases wrongly-blocked gassiot room. |
+| 🟡 LOW | **Investigate Steve Brooks** at streatham 2026-06-10: hub has duplicate booking (#6250 BDC + #4985 direct). Resolve or confirm both are legitimate. |
+| 🟡 LOW | **Delete ZZ TEST artifacts** (beds24Id=88364008 + 88363990) from Beds24 UI. |
+| ℹ INFO | **7 gassiot shadow-only BDC** (future dates) will auto-resolve when hub's reservation-import next runs. Monitor. |
+| ℹ INFO | **10 hub-only non-BDC** are non-critical (not BDC-visible). No oversell risk. Load into Beds24 if/when non-BDC channel management is needed. |
+
+STATUS: CC-C RECONCILIATION COMPLETE — waiting for Charlie to run "Import Existing Bookings"
+
+---
+
+## [DESKTOP → CC-D (cc: CC-B)] 2026-06-15 — FIX availability double-count after BDC import
+
+**Problem.** Now that the 149 BDC bookings are imported into Beds24, Beds24 subtracts them from
+its own records to compute availability. But `beds24-initial-load.mjs` pushed
+`numAvail = totalUnits − bookings − Blocks` (bookings already subtracted). So booked nights are
+counted **twice**, and because each booking is baked into the pushed number, a **cancellation does
+not reopen the room** (Beds24 frees its copy but the stale pushed number still says full). This is
+a live availability bug on the 4 activated properties.
+
+**Fix = push availability as raw capacity and let Beds24 subtract its own bookings.** Do NOT delete
+anything from Turso — the hub's bookings are correct and needed (door codes, CRM, direct-site
+availability). Only the *number we push to Beds24* is wrong.
+
+### Step 1 — VERIFY Beds24's availability model first (probe, don't assume)
+On ONE room, far-future date (e.g. a Streatham room, 2027-02-15):
+1. `POST /inventory/rooms/calendar` set `numAvail = totalUnits` (capacity).
+2. `POST /bookings` create a test booking on that room/date (mark clearly, e.g. guest "ZZ AVAIL TEST").
+3. `GET /inventory/rooms/availability` (or calendar) — does Beds24 now report capacity−1
+   (**Model A:** Beds24 subtracts its own bookings) or still capacity (**Model B:** numAvail is a
+   hard override)?
+4. Delete the test booking; confirm availability returns to capacity.
+5. Clean up (delete booking, reset the date). Report which model it is.
+
+### Step 2 — Re-push availability as capacity (if Model A confirmed)
+Write a NEW one-off script `db/beds24-repush-availability.mjs` (do **not** edit CC-B's
+`beds24-initial-load.mjs`). For the 4 live properties, set per-day
+`numAvail = totalUnits − genuine Blocks` only (do NOT subtract bookings). Prices unchanged. Respect
+the 100-credit/5-min limit. **If Step 1 shows Model B**, STOP and report — the correct fix differs
+(keep capacity−bookings and rely on the hub re-pushing on cancellation; importing bookings wouldn't
+give auto-free) and DESKTOP/Charlie must re-decide.
+
+### Step 3 — Verify cancel-frees-room
+Confirm on one booking that cancelling it in Beds24 reopens the room (no stuck/closed room).
+
+### Step 4 — Adjust the ongoing push (CC-D `beds24-push.mjs`)
+Change availability logic to push **capacity (totalUnits − Blocks)**, not capacity−bookings — OR
+stop pushing availability for the live BDC-managed rooms entirely and let Beds24 own it (it now
+holds every booking). Keep pushing **prices** (no conflict). Keep `BEDS24_PUSH_DRYRUN=1` until
+verified.
+
+### Step 5 — No booking duplicates
+Confirm the hub does NOT push BDC booking records into Beds24 (they're already channel-linked from
+the import). Only non-BDC + the ~12 retired-room bookings go via API.
+
+**Note / follow-up:** the hub's *own* availability logic (for the direct site) is unchanged — it
+still subtracts bookings; we're only changing the number pushed to Beds24. Once the hub stops
+pushing availability, a future **direct booking** must be written into Beds24 as a booking so it
+closes the OTA date (direct-booking write-back — separate task with the web-dev work).
+
+Production Turso: no destructive writes; test bookings far-future + cleaned up same session. Post
+results to this log.
+
+STATUS: WAITING FOR CC-D
+
+---
+
+## [CC-D] 2026-06-15 — Fix availability double-count (post-BDC import)
+
+**Task**: Fix numAvail double-count after 149 BDC bookings imported into Beds24.
+**Result**: MODEL A confirmed; availability re-pushed as capacity; push script updated.
+
+---
+
+### Step 1 — Beds24 availability model probe
+
+**Method**: Gassiot Superior King/Twin (beds24RoomId=693528, totalUnits=1, beds24PropId=335066).
+Far-future test dates (2027-02-15, 2027-03-10, 2027-04-05). All bookings deleted same session.
+
+**Probe design** (Probe 3, definitive):
+1. POST `/inventory/rooms/calendar`: set `numAvail=1` (capacity) for 2027-04-05
+2. GET `/inventory/rooms/availability` BEFORE booking → `{"2027-04-05":true}` ✓
+3. POST `/bookings`: "ZZ MODEL TEST" booking for 2027-04-05..2027-04-06 (beds24Id=88371929)
+4. GET `/inventory/rooms/availability` AFTER booking → `{"2027-04-05":false}`
+
+**RESULT: MODEL A CONFIRMED** — Beds24 subtracts its own bookings from the pushed numAvail.
+- Before booking: numAvail=1 → available=true
+- After booking: numAvail=1 minus 1 booking = 0 → available=false
+
+**Implication of the bug**: CC-B pushed `numAvail = totalUnits − hub_bookings − blocks`. After 149
+BDC bookings were imported, Beds24 additionally subtracted those same bookings → double-count.
+Booked dates that Beds24 already blocks via its own booking were further restricted by our stale
+pushed value → false-full on OTA.
+
+**Rate cost**: ~25 credits across all 3 probes (68.9→75.5 remaining after cleanup).
+
+Note: `GET /inventory/rooms/calendar` always returns `[]` for these rooms — it only shows
+non-default overrides. The correct endpoint is `GET /inventory/rooms/availability` which returns
+per-date true/false as Beds24 computes it (capacity − bookings).
+
+---
+
+### Step 3 — Cancel-frees-room verification (folded into Step 1)
+
+After cancelling booking 88371929 via `POST /bookings [{id: 88371929, status: 'cancelled'}]`:
+```
+availability AFTER cancel: {"2027-04-05":true}
+→ CANCEL-FREES-ROOM: YES
+```
+When numAvail=capacity and Beds24 manages bookings, cancellation correctly reopens the date.
+This is the desired final state once all inventory SyncJob pushes stop.
+
+All 3 test bookings (88371849, 88371902, 88371929) deleted same session. Test dates confirmed clean:
+- `2027-02-15: available=true` ✓
+- `2027-03-10: available=true` ✓
+- `2027-04-05: available=true` ✓
+
+---
+
+### Step 2 — Re-push availability as capacity
+
+**New script**: `db/beds24-repush-availability.mjs` (do NOT confuse with CC-B's `beds24-initial-load.mjs`)
+
+**Logic**: `numAvail = totalUnits − genuine Blocks only` (no booking subtraction). Price1 and
+minStay left untouched. Seamless excluded (held back). 24 rooms across 4 live properties.
+
+**Live run output (2026-06-15)**:
+```
+=== beds24-repush-availability ===
+Horizon: 2026-06-15 → 2027-06-16
+Rooms to process: 24
+
+  gassiot rt=8..14: totalUnits=1 | blocks=0 | 367 days → 1 range → numAvail=1  (7 rooms)
+  streatham rt=1,2,3,5: totalUnits=2 | blocks=0 | 367 days → 1 range → numAvail=2  (4 rooms)
+  streatham rt=4,6,7: totalUnits=1 | blocks=0 | 367 days → 1 range → numAvail=1  (3 rooms)
+  tooting rt=15..20: totalUnits=1 | blocks=0 | 367 days → 1 range → numAvail=1  (6 rooms)
+  valnay rt=21,22,24: totalUnits=1 | blocks=0 | 367 days → 1 range → numAvail=1  (3 rooms)
+  valnay rt=23: totalUnits=3 | blocks=0 | 367 days → 1 range → numAvail=3
+
+Done: 24 rooms updated, 0 errors.
+```
+
+**Post-repush spot-check**:
+- Streatham Triple (beds24=693503, totalUnits=2), Aug 1-5 (no bookings): `available=true` ✓
+- Streatham Triple, Jun 13-17 (1 in-stay booking at unit 1): `available=true` ✓ (2−1=1 unit left)
+
+Rate cost: 24 credits (one POST per room). 75.5 → 71 remaining.
+
+---
+
+### Step 4 — `beds24-push.mjs` updated: no longer pushes inventory
+
+`queue-inventory.mjs` and `poll-booking-emails.mjs` queue inventory SyncJob rows with
+`field='inventory'` using the formula `totalUnits − bookings − blocks`. These values are stale
+(computed at queue time) and would double-count once Beds24 holds the bookings.
+
+**Fix applied** to `db/beds24-push.mjs`:
+1. At startup, bulk-marks all pending `booking.com` + `field='inventory'` SyncJob rows as `done`
+   with note `'skipped: Beds24 self-manages availability post-BDC import (Model A)'`. This cleans
+   up any existing inventory rows and future ones queued on new bookings.
+2. Main query adds `AND j.field != 'inventory'` (belt-and-suspenders: filter them out of the
+   price/minstay push even if the mark-done step missed any).
+
+Checked current queue: `price=8497, inventory=0` — no inventory rows pending right now.
+`BEDS24_PUSH_DRYRUN` remains unset (dry-run default) per brief.
+
+---
+
+### Step 5 — No BDC booking records pushed from hub
+
+Confirmed by code audit. No hub code path creates BDC bookings in Beds24:
+
+| Script | Does it write to Beds24? | BDC bookings? |
+|---|---|---|
+| `beds24-load-bookings.mjs` | Yes (POST /bookings) | EXCLUDED: `WHERE channel NOT IN ('booking.com', 'bdc')` |
+| `beds24-pull.mjs` | Writes only to `Beds24BookingShadow` (shadow table) | N/A |
+| `beds24-push.mjs` (CC-D) | Yes (POST /inventory/rooms/calendar) | Calendar only (price, minstay) — no booking records |
+| `queue-inventory.mjs` | No — creates SyncJob rows only | N/A |
+| `poll-booking-emails.mjs` | No — creates SyncJob rows only | N/A |
+
+BDC bookings flow: BDC → Beds24 directly (via channel connection). Hub imports them via
+`beds24-pull.mjs` into the shadow table for CRM/door-code purposes only.
+
+---
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `db/beds24-repush-availability.mjs` | **NEW** — one-off repush of numAvail=capacity for 24 rooms |
+| `db/beds24-avail-probe.mjs` | **NEW** — probe script (kept for reference; safe to delete) |
+| `db/beds24-push.mjs` | **UPDATED** — retires inventory SyncJob rows; filters inventory from push query |
+
+---
+
+### For Charlie
+
+- **Check the Beds24 calendar** for any occupied room (e.g. Streatham Triple Jun 13-17): it
+  should now show `available=true` (1 unit left) rather than `false` (double-counted down to 0).
+  If the Beds24 dashboard shows availability numbers, they should match `totalUnits − active_bookings`.
+- **No re-run of `beds24-initial-load.mjs` needed** — the repush script targeted only numAvail,
+  leaving all prices intact.
+- **CC-D outbound** (`beds24-push.mjs`) remains in dry-run mode. Go-live gate unchanged: set
+  `BEDS24_PUSH_DRYRUN=0` in `.env` only after confirming prices on BDC match the hub Sheet.
+
+STATUS: CC-D AVAILABILITY FIX COMPLETE — waiting for Charlie to verify Beds24 UI shows correct availability
+
+---
+
+## [DESKTOP → CC] 2026-06-15 — Map Beds24 rooms ↔ Expedia (Charlie set up the connection)
+
+Charlie added Beds24 as Expedia connectivity provider + entered the Expedia hotel ID. Now the
+Beds24 rooms need mapping to Expedia room codes. He can't do it in the UI easily (Beds24 shows no
+photos, only Beds24 IDs). New file **`roomtypes-channel-map.csv`** has the Expedia room id (`EXP ID`)
+per room alongside `BDC ID`.
+
+**Task:**
+1. **Build the map.** Join `roomtypes-channel-map.csv` → internal `RoomType` (by `bdcRoomId`, fall
+   back to name) → `beds24RoomId` (Turso). Produce `beds24RoomId ↔ expediaRoomId`. Store
+   `expediaRoomId` (+ `expediaName`) on `RoomType` (those columns already exist in schema). Dedupe
+   multi-room types (e.g. Streatham Triple = rooms 1+4, Valnay Business = 1+3+6).
+2. **Probe the API.** `GET /channels/settings` for the Expedia channel to see the structure, then
+   test whether `POST /channels/settings` can SET a room's Expedia room code on ONE room. **Report
+   whether the Beds24 API supports setting the Expedia room mapping.**
+   - If YES → set the Expedia room mapping for **Streatham + Tooting only** (Valnay + Gassiot are
+     suspended on Expedia — their codes won't be available until reactivated; Seamless isn't on
+     Expedia — blank EXP ID).
+   - If NO → report it; DESKTOP will drive the Beds24 "Get Codes" mapping in Chrome using this CSV.
+3. **Flag the gap:** the CSV has Expedia ROOM ids but not RATE PLAN ids (needed for price sync).
+   Note which rooms still need a rate-plan code (from "Get Codes" / EPC) before Expedia prices can flow.
+
+Do NOT enable/activate the Expedia channel or push availability — mapping only. Read-only vs Turso
+except the additive `expediaRoomId`/`expediaName` writes. Post results to this log.
+
+STATUS: WAITING FOR CC
+
+---
+
+## [CC-A] 2026-06-16 — Beds24 ↔ Expedia room ID map
+
+### Step 1 — Map built and written to Turso
+
+Joined `roomtypes-channel-map.csv` → `RoomType.bdcRoomId` → `RoomType.beds24RoomId`. All 24 rooms with Expedia codes updated (`expediaRoomId` + `expediaName` on `RoomType`). Seamless (5 rooms) left null — not on Expedia.
+
+**Full committed map (beds24RoomId ↔ expediaRoomId):**
+
+| rtId | Property | beds24RoomId | expediaRoomId | Expedia name | Status |
+|---|---|---|---|---|---|
+| 1 | streatham | 693503 | 328282146 | Executive House, Accessible, Ensuite | ACTIVE |
+| 2 | streatham | 693501 | 327939022 | Quadruple Room, Shared Bathroom | ACTIVE |
+| 3 | streatham | 693505 | 328282162 | Executive House, Shared Bathroom | ACTIVE |
+| 4 | streatham | 693504 | 327940745 | Comfort Twin Room, Ensuite | ACTIVE |
+| 5 | streatham | 693499 | 327910457 | Double Room, Ensuite | ACTIVE |
+| 6 | streatham | 693500 | 327940744 | Luxury Apartment, Private Bathroom | ACTIVE |
+| 7 | streatham | 693502 | 327940739 | Single Room, Shared Bathroom (Single Bed) | ACTIVE |
+| 8 | gassiot | 693528 | 328302372 | Superior Twin Room, Shared Bathroom | SUSPENDED |
+| 9 | gassiot | 693526 | 327972143 | Business Double Room, Shared Bathroom | SUSPENDED |
+| 10 | gassiot | 693527 | 328118581 | Business Twin Room, Shared Bathroom | SUSPENDED |
+| 11 | gassiot | 693530 | 328519010 | Basic Double or Twin Room, Shared Bathroom | SUSPENDED |
+| 12 | gassiot | 693529 | 328518932 | Basic Double Room, Shared Bathroom | SUSPENDED |
+| 13 | gassiot | 693525 | 328273768 | Business Single Room, Shared Bathroom | SUSPENDED |
+| 14 | gassiot | 693524 | 328302445 | Economy House, Shared Bathroom | SUSPENDED |
+| 15 | tooting | 693512 | 326405063 | Double Room, Shared Bathroom | ACTIVE |
+| 16 | tooting | 693513 | 326405088 | Double Room, Shared Bathroom (1) | ACTIVE |
+| 17 | tooting | 693514 | 326405102 | Double Room, Shared Bathroom (2) | ACTIVE |
+| 18 | tooting | 693515 | 326405110 | Double Room, Shared Bathroom (3) | ACTIVE |
+| 19 | tooting | 693516 | 326405142 | Double Room, Shared Bathroom (4) | ACTIVE |
+| 20 | tooting | 693517 | 326405541 | Deluxe Double Room, Shared Bathroom | ACTIVE |
+| 21 | valnay | 693521 | 327887168 | Basic Twin Room, Shared Bathroom | SUSPENDED |
+| 22 | valnay | 693519 | 327885981 | Basic Twin Room, Private Bathroom | SUSPENDED |
+| 23 | valnay | 693520 | 327886454 | Business Double Room, Shared Bathroom | SUSPENDED |
+| 24 | valnay | 693518 | 327878170 | Basic Double Room, Shared Bathroom | SUSPENDED |
+| 25–29 | seamless | 693507–693511 | — | — | NOT ON EXPEDIA |
+
+Note on Seamless CSV anomaly: CSV rows for Seamless swap BDC IDs (Room 1 shows bdcId=1268631803, Large Double shows 1268631801) compared to ROOMTYPE_MAP_REFERENCE. Irrelevant to this task (no Expedia IDs), but worth checking if Seamless ever goes on Expedia.
+
+### Step 2 — API probe: POST /channels/settings for Expedia room codes
+
+**Result: NO — the Beds24 API cannot set Expedia room codes at this time.**
+
+`GET /channels/settings?channel=expedia&propertyId=335059` → `count: 0, data: []` for all 5 properties. `POST /channels/settings` with channel `"expedia"` (and all name variants tried: `Expedia`, `expediaConnect`, `homeaway`, `expedia_collect`, `hotelscombined`) → HTTP 201, `success: false`, error: `"unknown channel"`.
+
+This is expected: Beds24 only exposes channels that have been activated in its own UI (SETUP → Channels). Even `bookingdotcom` returns "unknown channel" via the API despite BDC bookings flowing — the channel settings UI path and the API route are separate. The Beds24 "Get Codes" button in the room-mapping UI is what wires up the Expedia room code; it is not reachable via the v2 API.
+
+**DESKTOP should drive the Beds24 "Get Codes" / Expedia mapping in the UI using the map above.** 13 rooms to map (streatham ×7, tooting ×6). The `expediaRoomId` column in Turso is already populated for reference when building the Expedia push script.
+
+### Step 3 — Rate plan IDs: gap flagged
+
+The `RoomType.expediaRatePlanId` column exists in the schema but is null for all rooms. The CSV contains room-level Expedia IDs only — **no rate plan codes**.
+
+Rate plan codes are needed before Expedia price sync can flow (Beds24 pushes per rate plan, not just per room). They are obtained via the Beds24 "Get Codes" flow during the UI room-mapping step — the same UI step that maps room IDs.
+
+**Action for DESKTOP:** when doing "Get Codes" in the Beds24 Expedia channel UI, capture the rate plan code(s) per room and report back so they can be written to `expediaRatePlanId`. Alternatively, after the connection is live, `GET /channels/settings?channel=expedia` should return rate plan codes which CC-A can then persist automatically.
+
+STATUS: CC-A EXPEDIA MAP COMPLETE — DESKTOP to drive Beds24 UI "Get Codes" for Streatham + Tooting; then report rate-plan IDs back for persistence
