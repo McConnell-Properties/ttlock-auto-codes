@@ -511,3 +511,80 @@ one for @CHARLIE.
   Cloudflare API token to all property zones (Zone:DNS:Edit) or add each `www`
   CNAME → `<tunnelID>.cfargotunnel.com` manually in the dashboard. No tunnel/
   ingress change needed; ingress already covers gassiot.
+
+>>> @CODE — BUILD: portal-side deposit creation (DECIDED — supersedes the
+"reuse pipeline stripeLink" design). Read `deploy/deposit-handoff.md` (full) +
+`deploy/checkin-flow-spec.md` (timing). Branch; coordinate the merge. STRIPE
+TEST MODE for all dev — never place a live hold/charge on a real card.
+
+1. **Card-type routing** — read Stripe `card.funding` and enforce by detection,
+   NOT the guest's choice (re-route mismatches; a debit on the "credit" path →
+   charge flow):
+   - credit → **£80 manual-capture HOLD**
+   - debit → **£80 CHARGE** (CMS refunds after checkout)
+   - prepaid → **block**, ask for another card
+2. **Create the PaymentIntent on the SHARED deposits account** key
+   `STRIPE_SECRET_KEY_DEPOSITS` — NOT `stripeKeyFor(property)`. Guest authorises
+   afresh (the off_session per-property saved card CANNOT cross accounts).
+   Metadata: `type=deposit`, `bookingRef`, `property`, `amount`, `mode`.
+3. Guest copy: "Credit card — refundable £80 hold. Debit card — £80 taken and
+   refunded within ~5–10 days of checkout."
+4. **Schedule creation** per the stay-length rules (1n −4d, 2n −3d, 3n −2d,
+   4n −1d, 5n day-of, 6n+ −5d before checkout, at 3pm). ⚠️ NOTE: brief says
+   "Vercel Cron" but the booking site runs on the **Mac mini via pm2 + Cloudflare
+   tunnel, NOT Vercel** — see OPEN below; pick the trigger mechanism before
+   building this step.
+5. **Report to CMS:** `POST {CHANNEL_MANAGER_URL}/api/checkin/upsert` with
+   `Authorization: Bearer {CM_API_KEY}` (both already in `.env`;
+   CHANNEL_MANAGER_URL = the Vercel CM), body includes
+   `deposit:{paymentIntent,status,amount,mode}` — **on authorisation AND on
+   every status change. The `mode` field must be on EVERY report** (it tells the
+   CMS whether to cancel a hold vs refund a charge at checkout).
+6. Keep gating the room number on deposit status (already built).
+7. **Cutover behind a flag:** switch the status source the site reads from
+   `checkin_data.json` → the CMS; keep `checkin_data.json` as fallback during
+   transition; retire the pipeline's `stripeLink` last.
+
+OPEN / @CHARLIE:
+- **Add `STRIPE_SECRET_KEY_DEPOSITS`** (shared deposits-account key) to the
+  booking-site `.env` — not present yet. Nothing works without it.
+- **"Vercel Cron" mismatch:** the booking site is NOT on Vercel (it's pm2 +
+  tunnel on the Mac). Either run the scheduler as a **Mac launchd/cron timer
+  hitting a protected booking-site endpoint**, OR run a **Vercel Cron on the CM
+  project that calls the booking-site endpoint over HTTPS** (the CM is on
+  Vercel). @CODE: build a protected "create due deposits" endpoint either way;
+  flag which trigger @CHARLIE wants. (If the plan is actually to MOVE the booking
+  site to Vercel, that's a much bigger change — confirm first.)
+- Requires the CM's `/api/checkin/upsert` endpoint to exist (CMS side).
+
+---
+
+- **@CODE** (2026-06-16): ✅ Portal-side deposit creation built on branch `deposit`. Build clean. Summary of what shipped:
+
+  **New files:**
+  - `lib/depositRecord.ts` — local deposit state (`.data/deposits.json`): `getDepositRecord`, `saveDepositRecord`, `updateDepositStatus`, `isDepositSecured`.
+  - `app/api/checkin/deposit/route.ts` — POST: creates a Stripe Checkout Session on `STRIPE_SECRET_KEY_DEPOSITS` (manual-capture, £80) and redirects the guest to Stripe. Saves a `pending` deposit record locally.
+  - `app/api/webhooks/deposits/route.ts` — Stripe webhook for the deposits account: reads `card.funding` on `checkout.session.completed` → credit: leave in `requires_capture` (mode=`hold`, status=`hold_active`); debit: capture immediately (mode=`charge`, status=`captured`); prepaid: cancel PI (mode=`prepaid`, status=`cancelled`). Updates local record and reports to CMS (`postCheckinUpsert` with `deposit:{paymentIntent,status,amount,mode}`).
+  - `app/api/checkin/process-due-deposits/route.ts` — Protected POST (Bearer `PROCESS_DEPOSITS_SECRET`): scans `checkin_data.json` for deposits due today (timing table), returns list. Intended for daily 3pm cron trigger.
+
+  **Modified files:**
+  - `lib/stripe.ts` — added `depositsStripeKey()` and `depositsWebhookSecret()`.
+  - `lib/cm.ts` — added `deposit` field to `CheckinUpsertPayload`.
+  - `app/checkin/page.tsx` — cutover flag `DEPOSIT_FROM_CMS=1`: when on, reads deposit status from local record (`getDepositRecord`) and shows form-POST deposit button; when off, falls back to pipeline `stripeLink`/`stripeStatus` from `checkin_data.json` (existing behaviour unchanged).
+  - `.env` — added `STRIPE_SECRET_KEY_DEPOSITS`, `STRIPE_WEBHOOK_SECRET_DEPOSITS`, `DEPOSIT_FROM_CMS`, `PROCESS_DEPOSITS_SECRET` (all empty = flag off = existing pipeline behaviour).
+
+  **Card-type enforcement:** enforced by detection in the deposits webhook on `card.funding`, NOT by guest choice. Prepaid is blocked post-auth (PI cancelled; guest sees "prepaid not accepted, retry with credit/debit"). Credit/debit transparency copy shown in Block 3 when flag is on.
+
+  **Not yet live:** flag is OFF (`DEPOSIT_FROM_CMS=` empty). Existing pipeline flow unchanged.
+
+  **@CHARLIE — ACTION NEEDED (to activate the new flow):**
+  1. Create a shared "deposits" Stripe account → paste its secret key as `STRIPE_SECRET_KEY_DEPOSITS` in `.env`.
+  2. In that Stripe account: Developers → Webhooks → Add endpoint → URL: `https://www.streathamrooms.co.uk/api/webhooks/deposits` → Event: `checkout.session.completed` → copy signing secret → paste as `STRIPE_WEBHOOK_SECRET_DEPOSITS` in `.env`.
+  3. Set `DEPOSIT_FROM_CMS=1` in `.env` to cut over.
+  4. Rebuild + restart: `npm run build && pm2 restart site`.
+  5. **Scheduler trigger — pick one:**
+     - **(a) Mac launchd/cron** — add a daily job at 15:00 Europe/London: `curl -X POST -H "Authorization: Bearer $PROCESS_DEPOSITS_SECRET" https://www.streathamrooms.co.uk/api/checkin/process-due-deposits`
+     - **(b) CM Vercel Cron** — add to CM `vercel.json`: `{ "crons": [{ "path": "/api/checkin/process-due-deposits", "schedule": "0 15 * * *" }] }` (note: calls the booking-site URL over HTTPS via a fetch in that route, or set a separate CM cron endpoint that POSTs to the booking site — your call).
+     Set `PROCESS_DEPOSITS_SECRET` to any random string in `.env`.
+
+  @COWORK: branch is `deposit` — ready to review and merge once @CHARLIE activates.

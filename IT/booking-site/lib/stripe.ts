@@ -39,3 +39,12 @@ export function anyStripeKey(): string | undefined {
   }
   return process.env.STRIPE_SECRET_KEY;
 }
+
+// Shared deposits account — all properties' £80 security deposits live here.
+export function depositsStripeKey(): string | undefined {
+  return process.env.STRIPE_SECRET_KEY_DEPOSITS;
+}
+
+export function depositsWebhookSecret(): string | undefined {
+  return process.env.STRIPE_WEBHOOK_SECRET_DEPOSITS;
+}

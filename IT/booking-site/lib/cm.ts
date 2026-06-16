@@ -90,6 +90,12 @@ export type CheckinUpsertPayload = {
     status: string;
     stripeSession?: string | null;
   }[];
+  deposit?: {
+    paymentIntent: string | null;
+    status: string;
+    amount: number;
+    mode?: string | null;
+  } | null;
   updatedAt?: string;
 };
 

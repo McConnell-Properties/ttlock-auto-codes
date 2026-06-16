@@ -5,7 +5,8 @@ import { findBookingByRef, verifyToken, PORTAL_COOKIE } from '@/lib/portal';
 import { getCheckinContact } from '@/lib/checkinContacts';
 import CheckinContactForm from './CheckinContactForm';
 import CheckinExtrasBlock from './CheckinExtrasBlock';
-import { stripeKeyFor } from '@/lib/stripe';
+import { stripeKeyFor, depositsStripeKey } from '@/lib/stripe';
+import { getDepositRecord } from '@/lib/depositRecord';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,10 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
   const prop = currentProperty();
   const checkin = prop.checkin;
   const payNow = !!stripeKeyFor(prop.id);
+
+  // Cutover flag: when '1', use portal-created deposit (STRIPE_SECRET_KEY_DEPOSITS)
+  // instead of the pipeline's stripeLink/stripeStatus from checkin_data.json.
+  const depositFromCms = process.env.DEPOSIT_FROM_CMS === '1';
 
   const ref = verifyToken(cookies().get(PORTAL_COOKIE)?.value);
   const booking = ref ? await findBookingByRef(ref) : null;
@@ -153,8 +158,16 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
   const today = new Date().toISOString().slice(0, 10);
   const showCode = !!booking.lockCode && booking.checkIn <= today;
 
-  const isSecured = SECURED.has(booking.stripeStatus || '');
-  const hasDepositLink = !!booking.stripeLink && !isSecured;
+  // Deposit status: flag ON → portal-created deposit record; flag OFF → pipeline data.
+  const depositRecord = depositFromCms ? getDepositRecord(ref!) : null;
+  const depositStatus = depositRecord?.status ?? (depositFromCms ? 'none' : (booking.stripeStatus || 'none'));
+  const isSecured = SECURED.has(depositStatus);
+  const depositBlocked = depositRecord?.mode === 'prepaid'; // prepaid card blocked
+  const depositPending = depositRecord?.status === 'pending'; // just returned from checkout
+  const hasDepositButton = depositFromCms
+    ? !isSecured && !depositBlocked && !!depositsStripeKey()
+    : (!!booking.stripeLink && !isSecured);
+
   const dueDate = depositDueDate(booking.checkIn, booking.checkOut);
   const dueDateLabel = `${fmtShort(dueDate)} at 3:00 pm`;
   const dueIsToday = dueDate === today;
@@ -290,7 +303,7 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
             <p style={{ margin: 0, lineHeight: 1.7 }}>
               ✅ Security deposit received. Your room number is{' '}
               <strong style={{ fontSize: '1.1rem' }}>
-                {booking.room ?? "not yet assigned — we’ll confirm it shortly"}
+                {booking.room ?? "not yet assigned — we'll confirm it shortly"}
               </strong>.
               <br />
               <span className="fine">
@@ -298,8 +311,40 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
               </span>
             </p>
           </div>
-        ) : cardSaved && !dueIsToday && !dueIsPast ? (
-          // Card saved via extras checkout — auto-hold in the future.
+        ) : depositBlocked ? (
+          // Prepaid card was blocked — ask guest to retry with a different card.
+          <>
+            <div style={{ background: '#fff8f0', border: '1px solid #ffd0a0', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+              <p style={{ margin: 0, lineHeight: 1.7 }}>
+                ⚠️ Your prepaid card was not accepted for the security deposit.
+                Please authorise again with a <strong>credit or debit card</strong>.
+              </p>
+            </div>
+            <p className="fine" style={{ margin: '0 0 12px', lineHeight: 1.6 }}>
+              Credit card: refundable £80 hold (no charge unless there is damage).
+              Debit card: £80 taken now, refunded within 5–10 days of check-out.
+            </p>
+            {hasDepositButton && (
+              <form method="post" action="/api/checkin/deposit">
+                <button className="btn" type="submit" style={{ width: '100%' }}>Authorise £80 security deposit</button>
+                <p className="fine" style={{ textAlign: 'center', marginTop: 8 }}>Refresh this page after authorising to reveal your room number.</p>
+              </form>
+            )}
+          </>
+        ) : depositPending && !searchParams.depositPending ? (
+          // Webhook not yet processed (previous session interrupted mid-flight).
+          <p style={{ lineHeight: 1.7, margin: 0 }}>
+            Your security deposit is being processed. Please refresh this page in a moment.
+          </p>
+        ) : searchParams.depositPending === '1' && !isSecured ? (
+          // Just returned from Stripe checkout — webhook may not have fired yet.
+          <p style={{ lineHeight: 1.7, margin: 0 }}>
+            Your security deposit is being processed — this usually takes a few seconds.
+            <br />
+            <span className="fine">Refresh this page to check whether your room number is ready.</span>
+          </p>
+        ) : cardSaved && !depositFromCms && !dueIsToday && !dueIsPast ? (
+          // Card saved via extras checkout — auto-hold in the future (pipeline mode only).
           <p style={{ lineHeight: 1.7, margin: 0 }}>
             Your room number is hidden until your security deposit is taken.
             <br />
@@ -316,10 +361,20 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
               Your refundable <strong>£80</strong> security hold is due <strong>today</strong>. Authorise it now
               and your room number appears as soon as the hold is in place.
             </p>
-            {hasDepositLink && (
-              <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center' }}>
-                Authorise deposit →
-              </a>
+            {depositFromCms && (
+              <p className="fine" style={{ margin: '0 0 12px', lineHeight: 1.6 }}>
+                Credit card: refundable £80 hold (no charge unless there is damage).
+                Debit card: £80 taken now, refunded within 5–10 days of check-out.
+              </p>
+            )}
+            {hasDepositButton && (depositFromCms
+              ? (
+                <form method="post" action="/api/checkin/deposit">
+                  <button className="btn" type="submit" style={{ width: '100%' }}>Authorise £80 security deposit</button>
+                  <p className="fine" style={{ textAlign: 'center', marginTop: 8 }}>Refresh this page after authorising to reveal your room number.</p>
+                </form>
+              )
+              : <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center' }}>Authorise deposit</a>
             )}
           </>
         ) : dueIsPast ? (
@@ -329,10 +384,20 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
               We weren&apos;t able to place your <strong>£80</strong> security hold yet. Please authorise it now
               to reveal your room number.
             </p>
-            {hasDepositLink && (
-              <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center' }}>
-                Authorise deposit →
-              </a>
+            {depositFromCms && (
+              <p className="fine" style={{ margin: '0 0 12px', lineHeight: 1.6 }}>
+                Credit card: refundable £80 hold (no charge unless there is damage).
+                Debit card: £80 taken now, refunded within 5–10 days of check-out.
+              </p>
+            )}
+            {hasDepositButton && (depositFromCms
+              ? (
+                <form method="post" action="/api/checkin/deposit">
+                  <button className="btn" type="submit" style={{ width: '100%' }}>Authorise £80 security deposit</button>
+                  <p className="fine" style={{ textAlign: 'center', marginTop: 8 }}>Refresh this page after authorising to reveal your room number.</p>
+                </form>
+              )
+              : <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center' }}>Authorise deposit</a>
             )}
           </>
         ) : (
@@ -345,15 +410,29 @@ export default async function CheckinPage({ searchParams }: { searchParams: SP }
               <strong>{dueDateLabel}</strong>. This is a hold only — not a charge. Your card will not be debited
               unless there is damage.
             </p>
-            {hasDepositLink && (
-              <>
-                <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center', marginBottom: 8 }}>
-                  Authorise £80 security deposit →
-                </a>
-                <p className="fine" style={{ textAlign: 'center' }}>
-                  Refresh this page after authorising to reveal your room number.
-                </p>
-              </>
+            {depositFromCms && (
+              <p className="fine" style={{ margin: '0 0 12px', lineHeight: 1.6 }}>
+                Credit card: refundable £80 hold (no charge unless there is damage).
+                Debit card: £80 taken now, refunded within 5–10 days of check-out.
+              </p>
+            )}
+            {hasDepositButton && (depositFromCms
+              ? (
+                <form method="post" action="/api/checkin/deposit">
+                  <button className="btn" type="submit" style={{ width: '100%' }}>Authorise £80 security deposit</button>
+                  <p className="fine" style={{ textAlign: 'center', marginTop: 8 }}>Refresh this page after authorising to reveal your room number.</p>
+                </form>
+              )
+              : (
+                <>
+                  <a href={booking.stripeLink!} className="btn" style={{ display: 'block', textAlign: 'center', marginBottom: 8 }}>
+                    Authorise £80 security deposit
+                  </a>
+                  <p className="fine" style={{ textAlign: 'center' }}>
+                    Refresh this page after authorising to reveal your room number.
+                  </p>
+                </>
+              )
             )}
           </>
         )}
