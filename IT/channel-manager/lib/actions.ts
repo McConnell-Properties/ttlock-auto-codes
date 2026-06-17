@@ -1,6 +1,7 @@
 'use server';
 
 import * as data from './data';
+import { triggerBeds24Push } from './beds24-push';
 import { createCheckoutSession, getSessionStatus } from './stripe';
 import { sendEmail, paymentEmailBody } from './email';
 import { revalidatePath } from 'next/cache';
@@ -17,6 +18,7 @@ export async function setPrice(roomTypeId: number, date: string, price: number) 
   }
   revalidatePath('/calendar');
   revalidatePath('/sync');
+  triggerBeds24Push();
 }
 
 export async function setBlock(roomTypeId: number, date: string, units: number, reason?: string) {
@@ -28,6 +30,7 @@ export async function setBlock(roomTypeId: number, date: string, units: number, 
   await data.queueInventorySync(roomTypeId, [date]);
   revalidatePath('/calendar');
   revalidatePath('/sync');
+  triggerBeds24Push();
 }
 
 export async function setBasePrice(roomTypeId: number, price: number) {
@@ -56,6 +59,7 @@ export async function createBooking(input: {
   revalidatePath('/calendar');
   revalidatePath('/sync');
   revalidatePath('/');
+  triggerBeds24Push();
   return id;
 }
 
@@ -72,6 +76,7 @@ export async function cancelBooking(id: number) {
   revalidatePath('/calendar');
   revalidatePath('/sync');
   revalidatePath('/');
+  triggerBeds24Push();
 }
 
 export async function reallocate(bookingId: number, physicalRoom: string | null) {
@@ -112,6 +117,7 @@ export async function moveBookingAction(
   revalidatePath('/calendar');
   revalidatePath('/bookings');
   revalidatePath('/sync');
+  triggerBeds24Push();
   return { ok: true };
 }
 

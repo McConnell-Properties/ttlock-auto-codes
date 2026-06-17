@@ -845,7 +845,7 @@ export function pendingSyncJobs() {
   return all<SyncJobWithRoom>(
     `SELECT j.*, rt.name AS roomTypeName, rt.bdcRoomId, rt.expediaName, p.name AS propertyName
      FROM SyncJob j JOIN RoomType rt ON rt.id = j.roomTypeId JOIN Property p ON p.id = rt.propertyId
-     WHERE j.status = 'pending' ORDER BY j.channel, p.name, j.date`
+     WHERE j.status IN ('pending', 'processing') ORDER BY j.channel, p.name, j.date`
   );
 }
 
@@ -853,13 +853,13 @@ export function recentSyncJobs(limit = 30) {
   return all<SyncJobWithRoom>(
     `SELECT j.*, rt.name AS roomTypeName, rt.bdcRoomId, rt.expediaName, p.name AS propertyName
      FROM SyncJob j JOIN RoomType rt ON rt.id = j.roomTypeId JOIN Property p ON p.id = rt.propertyId
-     WHERE j.status != 'pending' ORDER BY j.doneAt DESC LIMIT ?`,
+     WHERE j.status NOT IN ('pending', 'processing') ORDER BY j.doneAt DESC LIMIT ?`,
     [limit]
   );
 }
 
 export async function pendingSyncCount(): Promise<number> {
-  const r = await one<{ n: number }>(`SELECT COUNT(*) AS n FROM SyncJob WHERE status = 'pending'`);
+  const r = await one<{ n: number }>(`SELECT COUNT(*) AS n FROM SyncJob WHERE status IN ('pending', 'processing')`);
   return Number(r?.n ?? 0);
 }
 
@@ -876,9 +876,12 @@ export async function setSyncJobsStatus(ids: number[], status: 'done' | 'failed'
 }
 
 async function createSyncJob(channel: string, roomTypeId: number, date: string, field: string, value: string) {
-  // Supersede any pending job for the same target
+  // Supersede any existing job for the same target (pending or in-flight).
+  // Deleting a processing row is safe: the drainer already read the data into
+  // memory, so the subsequent markJobs() becomes a no-op on the deleted row.
   await run(
-    `DELETE FROM SyncJob WHERE roomTypeId = ? AND date = ? AND channel = ? AND field = ? AND status = 'pending'`,
+    `DELETE FROM SyncJob WHERE roomTypeId = ? AND date = ? AND channel = ? AND field = ?
+     AND status IN ('pending', 'processing')`,
     [roomTypeId, date, channel, field]
   );
   await run(
