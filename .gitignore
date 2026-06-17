@@ -1,0 +1,23 @@
+.vercel
+
+# Cross-project coordination hub (not code)
+/ProjectHub/
+
+# Dependencies and build output
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env*.local
+
+# Logs and local dev artifacts
+*.log
+*.tsbuildinfo
+.DS_Store
+*.db
+*.db-journal
