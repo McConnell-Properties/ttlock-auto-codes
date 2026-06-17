@@ -251,3 +251,100 @@ DPR probe: POST numAvail=1 to room 693500 on 2026-07-01 (safe probe date). Respo
 Two paths:
 1. **Substitute:** re-run test on BDC room `1471588601` (beds24RoomId=693499, "Double room - Ensuite") — only Streatham room with confirmed DPR, same push path, proves the sync end-to-end
 2. **Fix first:** add Daily Price Rule for room 693500 in Beds24 UI (Properties → that room → Daily Price Rules tab), then re-run original test
+
+---
+
+## 2026-06-17 · REPORT · Empirical numAvail test — raw Beds24 responses
+
+**Method:** Single-date POST (numAvail=1, date=2026-07-01) then immediate GET /inventory/rooms/availability for ground truth. Three rooms: one known-good control + two previously-failing.
+
+---
+
+### Room 1: Valnay 693518 (previously failing)
+
+**POST payload:**
+```json
+[{"roomId":693518,"calendar":[{"from":"2026-07-01","to":"2026-07-01","numAvail":1}]}]
+```
+
+**POST full response (HTTP 201):**
+```json
+[{ "success": true }]
+```
+
+**numAvail in modified.calendar: NO**
+
+No `modified` field. No `errors`. No `warnings`. No `info`. Beds24 returns the bare minimum success envelope and silently discards numAvail with zero diagnostic content.
+
+**GET /inventory/rooms/availability:**
+```json
+{ "roomId": 693518, "name": "Double Room with Shared Bathroom",
+  "availability": { "2026-07-01": true } }
+```
+`true` = room is in service; does NOT confirm the push was applied (boolean, not a count). Would need to push 0 and check for false to verify via GET.
+
+---
+
+### Room 2: Valnay 693520 (control — known-working)
+
+**POST payload:**
+```json
+[{"roomId":693520,"calendar":[{"from":"2026-07-01","to":"2026-07-01","numAvail":1}]}]
+```
+
+**POST full response (HTTP 201):**
+```json
+[{
+  "success": true,
+  "modified": {
+    "roomId": 693520,
+    "calendar": [{ "from": "2026-07-01", "to": "2026-07-01", "numAvail": 1 }]
+  }
+}]
+```
+
+**numAvail in modified.calendar: YES**
+
+`modified.calendar` present and contains `numAvail: 1`. Push accepted and applied.
+
+**GET /inventory/rooms/availability:** `"2026-07-01": true` — consistent.
+
+---
+
+### Room 3: Streatham 693503 (originally reported)
+
+**POST payload:**
+```json
+[{"roomId":693503,"calendar":[{"from":"2026-07-01","to":"2026-07-01","numAvail":1}]}]
+```
+
+**POST full response (HTTP 201):**
+```json
+[{ "success": true }]
+```
+
+**numAvail in modified.calendar: NO**
+
+Identical pattern to 693518. `{"success":true}` only — no `modified`, no diagnostics. Silent drop.
+
+**GET /inventory/rooms/availability:** `"2026-07-01": true` — cannot confirm push.
+
+---
+
+### Summary
+
+| Room | Property | numAvail accepted | Beds24 diagnostic in response |
+|---|---|---|---|
+| 693518 | Valnay | NO — DROPPED | None. `{"success":true}` only |
+| 693520 | Valnay | YES — ACCEPTED | `modified.calendar[numAvail:1]` |
+| 693503 | Streatham | NO — DROPPED | None. `{"success":true}` only |
+
+**Failures are NOT stale.** Tested live 2026-06-17 ~19:xx. 693518 and 693503 still drop numAvail right now.
+
+**Beds24 provides zero diagnostic information** on a drop. The complete response body is `{"success":true}`. No `errors`, no `warnings`, no `info`. The only signal is the absence of `modified` — exactly what the DPR guard detects.
+
+**"Price Check shows prices + offers" does not imply numAvail pushes are accepted.** Price pushes (`price1`) use a different Beds24 mechanism. Confirmed by the earlier price-restore test on 693503: that same room accepted `price1:80` into `modified.calendar` (price DPR works) while still silently dropping `numAvail` (availability DPR absent or disabled). The two are independent room settings in Beds24.
+
+**Root cause is a Beds24-side per-room configuration.** The split in Valnay alone (693520 accepts, 693518 drops) proves it is not a property-level setting, not a timing issue, and not a channel-open/closed issue. Something is set differently on 693520 that is not set on the failing rooms.
+
+**Recommended next step (DESKTOP):** In Beds24 UI, open 693520 (working) and 693518 (failing) side-by-side. Compare: Room Settings → Availability type / Sell mode, and the Daily Price Rules tab. The setting that differs between them is the root cause. Once identified, apply to all failing rooms and re-run `node db/queue-inventory.mjs 90 valnay` + live push.
