@@ -137,3 +137,76 @@ Turso serializes writes; both UPDATEs execute in sequence, so B's UPDATE finds n
 - **`import-rates.mjs` not wired:** Rate imports via `db/import-rates.mjs` queue SyncJob rows directly (not through `lib/data.ts`), so they don't get an event-driven trigger. They're handled by the 10-min launchd cron as before.
 - **Narrow cron/fire-and-forget race:** If the launchd cron fires at the exact same instant as a Server Action fires a trigger, both read `pending` rows before the claim UPDATE runs. Both would POST the same data to Beds24 (harmless — same value pushed twice). The window is milliseconds; practical risk is negligible.
 - **`db/beds24-push.mjs` (launchd CLI) not updated:** The standalone CLI still queries `WHERE status='pending'` without claiming. It's the backstop only; launchd won't start a new instance while the previous run is still in progress (StartCalendarInterval semantics).
+
+---
+
+## 2026-06-17 · REPORT · Three ops + BDC status audit
+
+### 1 — Vercel: BEDS24_REFRESH_TOKEN
+
+**Was missing** from mcconnell-cm Vercel project. Added via `vercel env add` (value piped from `IT/channel-manager/.env`, never printed):
+
+| Environment | Status |
+|---|---|
+| Production | ✓ Added (17 min ago) |
+| Preview (all branches) | ✓ Added (empty-branch form `""`) |
+
+Confirmed via `vercel env ls` — both rows show `Encrypted`. This allows `runBeds24Push()` in the Vercel hub to refresh the Beds24 API token when it expires (token TTL < 24h; without this var the refresh would fail silently on every cold-start after expiry).
+
+### 2 — Launchd backstop: beds24-push / beds24-pull
+
+`IT/channel-manager/.env` already existed in the main repo (created 2026-06-17 18:09). Both jobs are live and clean:
+
+```
+- 0  com.mcconnell.cm.beds24-pull
+- 0  com.mcconnell.cm.beds24-push
+```
+
+(`-` = not currently running, `0` = last exit clean)
+
+**beds24-push log (last 3 runs at :30 :40 :50):**
+- 18:30 — 2 jobs pushed, 2 failed (`numAvail dropped — missing DPR?` for 693503 + 693499)
+- 18:40 — 1 job pushed, 1 failed (DPR guard)
+- 18:50 — 0 pending → `Nothing to push` ✓
+
+**beds24-pull log (last 3 runs):**
+- 18:15 — fetched 4 BDC bookings (CREATED: BDC-6091561098, BDC-5459827272, BDC-5266227909, BDC-5266257623)
+- 18:30 — 0 new bookings
+- 18:45 — 0 new bookings ✓
+
+Both jobs healthy. DPR failures are expected until Valnay/Streatham rooms get DPRs added in Beds24 UI.
+
+### 3 — Streatham Triple price restore (beds24RoomId=693503, 2026-06-20)
+
+**Finding:** The calendar API returned `"calendar": []` for 2026-06-20 — no live override, and a pending SyncJob with `value=85` (not 999). The session-prior "£999 test push" was likely overwritten by a £85 push (SyncJob id=20458, done 2026-06-16 22:18). Base price = £80.
+
+**Dry-run payload shown:**
+```json
+[{ "roomId": 693503, "calendar": [{ "from": "2026-06-20", "to": "2026-06-20", "price1": 80 }] }]
+```
+
+**Live push result:**
+- HTTP 201, `price1=80` confirmed in `modified.calendar` ✓ (DPR guard passed)
+- Stale pending SyncJob id=20459 (value=85) marked `done` with note `"manual restore: £80 pushed directly, supersedes queued £85"` — prevents cron from re-pushing £85
+
+**Current state:** Room 693503 on 2026-06-20 is now at £80 on Beds24. ✓
+
+### 4 — BDC status per property
+
+Data sources: Beds24 `/inventory/rooms/availability` (2026-06-17 → 2026-06-24) + SyncJob counts (last 7 days, `channel='booking.com'`).
+
+| Property | BDC connected | Rooms linked | Avail (open rooms) | Open SyncJobs | Failed (7d) | Top failure reason |
+|---|---|---|---|---|---|---|
+| Streatham Rooms | ✓ (bdcHotelId=14715886) | 7/7 | 7/7 open | 0 | 40 | numAvail dropped (missing DPR) |
+| Tooting Stays | ✓ (bdcHotelId=13576893) | 6/6 | 5/6 open* | 0 | 3 | numAvail dropped (missing DPR) |
+| Valnay Stays | ✓ (bdcHotelId=15779662) | 4/4 | 3/4 open* | 0 | 65 | wrote 1, read back 0 (38) + DPR (24) + session expired (3) |
+| Gassiot House | ✓ (bdcHotelId=15676333) | 7/7 | 7/7 open | 0 | 27 | numAvail dropped (DPR) + 2 legacy |
+| Seamless Stays | ✓ (bdcHotelId=12686318) | n/a | 3/5 rooms avail* | 18 | 2 | session expired (legacy BDC bot) |
+
+*Closed rooms have 0 availability for all dates queried — likely booked out or blocked, not a channel issue.
+
+**Key observations:**
+- **Streatham / Gassiot / Tooting:** All BDC-connected, rooms visible with availability — channel is functionally open
+- **Valnay:** 38 failures with note `"wrote 1, read back 0"` are pre-DPR-guard era (stale). 24 are current DPR failures (rooms 693521/693519/693518 have no Daily Price Rule). Fix: add DPRs in Beds24 UI then `node db/queue-inventory.mjs 90 valnay`
+- **Seamless:** 18 open SyncJobs are BDC jobs for the Seamless propertyId — these should not be pushed (Seamless is excluded in the drainer). The 2 failed jobs are legacy (session expired = old Playwright bot). The 18 open jobs may need manual cleanup.
+- **0 open SyncJobs on Streatham/Tooting/Gassiot/Valnay** — drainer is current; queue drains promptly (DPR failures are immediately marked failed, not stuck pending)
