@@ -86,3 +86,54 @@ BEDS24_PUSH_DRYRUN=0 node db/beds24-push.mjs
 - **`IT/channel-manager/.env` not in main repo:** The launchd `beds24-push` job will exit 1 (DATABASE_URL not set) until `.env` is created/copied here. Other jobs (stripe-sync etc.) that already run from this repo have their own .env — check whether a shared .env already exists in this tree or needs to be set up.
 - **`beds24-pull` also exiting 1** at first run — same .env issue. Once .env is in place both jobs will self-heal on next 10/15 min tick.
 - **Vercel cron:** `lib/beds24-push.ts` exports `runBeds24Push()` ready to wire into `app/api/cron/beds24-push/route.ts`. Hobby plan = once/day limit; GitHub Actions trigger needed for more frequent runs.
+
+---
+
+## 2026-06-17 · REPORT · P2 event-driven push + atomic claim
+
+**Branch:** `cms-dev`
+**Commit:** `89108a4` feat(beds24): P2 — event-driven push + atomic claim (concurrency-safe)
+
+### What shipped
+
+**Modified `lib/beds24-push.ts`:**
+- Atomic drainer claim: generates a `claimId = randomUUID().slice(0,8)` per run
+- `UPDATE SyncJob SET status='processing', processingAt=CURRENT_TIMESTAMP, note=claimId WHERE status='pending' AND channel='booking.com' AND beds24RoomId IS NOT NULL AND propertyId != 'seamless'`
+- `SELECT` only rows WHERE `note = claimId` — concurrent callers each see only their own batch
+- Stale recovery: resets `processing` rows WHERE `processingAt < datetime('now', '-10 minutes')` at start of each run
+- Module-level `localDraining` flag short-circuits a second fire-and-forget call within the same process while one is already running
+- Dry-run now restores claimed rows to `pending` (so the 10-min cron can pick them up normally)
+- Added export: `triggerBeds24Push()` — fires `runBeds24Push({dryRun:false})` void/un-awaited, errors logged to console (Next.js 14 — no `after()`)
+
+**Modified `lib/actions.ts`:**
+- Imported `triggerBeds24Push` from `./beds24-push`
+- Added `triggerBeds24Push()` (void, no await) AFTER the final `revalidatePath` in all five SyncJob write hooks:
+  - `setPrice` → after `queuePriceSync`
+  - `setBlock` → after `queueInventorySync`
+  - `createBooking` → after `createBookingWithSync`
+  - `cancelBooking` → after `queueInventorySync`
+  - `moveBookingAction` → single trigger after both `queueInventorySync` calls
+
+**Modified `lib/data.ts`:**
+- `createSyncJob`: DELETE now covers `status IN ('pending', 'processing')` — supersedes in-flight rows safely (drainer already has data in memory; the subsequent `markJobs` becomes a no-op on the deleted row)
+- `pendingSyncJobs`, `pendingSyncCount`: WHERE now includes `'processing'` rows — UI shows in-flight jobs as pending
+- `recentSyncJobs`: WHERE excludes both `'pending'` and `'processing'`
+
+**New `db/migrate-beds24-processing.mjs`:**
+- Adds `processingAt DATETIME` column to SyncJob
+- Already applied to production Turso; idempotent (safe to re-run)
+
+### Concurrency model
+
+```
+Server Action invocation A  →  claimId='abc123'  →  claims rows 1-5  →  POSTs  →  marks done
+Server Action invocation B  →  claimId='def456'  →  UPDATE finds 0 pending rows  →  returns {done:0, skipped:true}
+```
+
+Turso serializes writes; both UPDATEs execute in sequence, so B's UPDATE finds no pending rows if A claimed them first. The module-level `localDraining` flag provides an in-process short-circuit (no DB round-trip) for the common case.
+
+### Watch points / caveats
+
+- **`import-rates.mjs` not wired:** Rate imports via `db/import-rates.mjs` queue SyncJob rows directly (not through `lib/data.ts`), so they don't get an event-driven trigger. They're handled by the 10-min launchd cron as before.
+- **Narrow cron/fire-and-forget race:** If the launchd cron fires at the exact same instant as a Server Action fires a trigger, both read `pending` rows before the claim UPDATE runs. Both would POST the same data to Beds24 (harmless — same value pushed twice). The window is milliseconds; practical risk is negligible.
+- **`db/beds24-push.mjs` (launchd CLI) not updated:** The standalone CLI still queries `WHERE status='pending'` without claiming. It's the backstop only; launchd won't start a new instance while the previous run is still in progress (StartCalendarInterval semantics).
