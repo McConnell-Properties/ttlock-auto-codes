@@ -1,0 +1,49 @@
+name: beds24-cron
+
+on:
+  schedule:
+    # Every 10 minutes — push inventory, pull bookings from Beds24, sync booking mirror
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  push:
+    name: Push inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/beds24/cron/push
+        run: |
+          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+            "${{ vars.VERCEL_URL }}/api/beds24/cron/push" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  pull:
+    name: Pull from Beds24
+    needs: push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: POST /api/beds24/cron/pull
+        run: |
+          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+            "${{ vars.VERCEL_URL }}/api/beds24/cron/pull" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  sync-bookings:
+    name: Sync bookings hub↔Beds24
+    needs: pull
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/beds24/cron/sync-bookings
+        run: |
+          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+            "${{ vars.VERCEL_URL }}/api/beds24/cron/sync-bookings" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
