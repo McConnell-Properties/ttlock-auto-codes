@@ -58,6 +58,25 @@ type Props = {
   bookings: B[];
 };
 
+/** Greedy interval stacking: assigns bookings to the minimum number of lanes
+ *  so no two bookings in the same lane overlap (checkIn >= last.checkOut). */
+function assignLanes(bookings: B[]): B[][] {
+  const sorted = [...bookings].sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1));
+  const lanes: B[][] = [];
+  for (const bk of sorted) {
+    let placed = false;
+    for (const lane of lanes) {
+      if (bk.checkIn >= lane[lane.length - 1].checkOut) {
+        lane.push(bk);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) lanes.push([bk]);
+  }
+  return lanes;
+}
+
 function dayLabel(date: string) {
   const d = new Date(date + 'T00:00:00Z');
   const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
@@ -214,11 +233,17 @@ export default function MultiCal({ groups, dates, rates, bookings }: Props) {
     return date >= a && date <= b;
   };
 
-  const renderCells = (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean) =>
+  const renderCells = (
+    occ: (date: string) => B[],
+    rowTarget: RowTarget,
+    allowOverlapWarn: boolean,
+    conflictOcc?: (date: string) => B[]
+  ) =>
     dates.map((date) => {
       const list = occ(date);
-      const over = allowOverlapWarn && list.length > 1;
+      const fullList = conflictOcc ? conflictOcc(date) : list;
       const b = list[0];
+      const over = allowOverlapWarn && fullList.length > 1 && !!b;
       const isStart = b && (b.checkIn === date || date === windowStart);
       const highlighted = overKey === rowKey(rowTarget) && dragId !== null;
       const selected = !b && inSelection(rowTarget, date);
@@ -226,7 +251,7 @@ export default function MultiCal({ groups, dates, rates, bookings }: Props) {
         <td
           key={date}
           className={`mc-cell${b ? ' ' + channelClass(b.channel) : ''}${over ? ' mc-over' : ''}${b && b.checkIn === date ? ' mc-checkin' : ''}${highlighted ? ' mc-drop' : ''}${selected ? ' mc-sel' : ''}`}
-          title={list.map((x) => `#${x.id} ${x.guestName} · ${x.checkIn}→${x.checkOut} · ${x.channel}${x.channelRef ? ' · ' + x.channelRef : ''}`).join('\n')}
+          title={fullList.map((x) => `#${x.id} ${x.guestName} · ${x.checkIn}→${x.checkOut} · ${x.channel}${x.channelRef ? ' · ' + x.channelRef : ''}`).join('\n')}
           onClick={() => b && open(b)}
           onMouseDown={(e) => {
             if (!b && rowTarget.physicalRoom) {
@@ -261,10 +286,9 @@ export default function MultiCal({ groups, dates, rates, bookings }: Props) {
                 setDragDate(date);
               }}
               onDragEnd={() => { setDragId(null); setDragDate(null); setOverKey(null); }}
-              className={over ? 'mc-name' : isStart ? 'mc-name' : 'mc-cont'}
-              style={over ? { color: 'var(--red)', fontWeight: 700 } : undefined}
+              className={isStart ? 'mc-name' : 'mc-cont'}
             >
-              {over ? `⚠ ×${list.length}` : isStart ? shortName(b.guestName) : ' '}
+              {isStart ? shortName(b.guestName) : ' '}
             </span>
           )}
         </td>
@@ -644,7 +668,7 @@ function PropertyRows({
   untyped: B[];
   dates: string[];
   rates: Record<number, Record<string, number>>;
-  renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean) => React.ReactNode;
+  renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean, conflictOcc?: (date: string) => B[]) => React.ReactNode;
 }) {
   return (
     <>
@@ -687,7 +711,7 @@ function TypeRows({
   unassigned: B[];
   dates: string[];
   rates: Record<number, Record<string, number>>;
-  renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean) => React.ReactNode;
+  renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean, conflictOcc?: (date: string) => B[]) => React.ReactNode;
 }) {
   return (
     <>
@@ -697,16 +721,25 @@ function TypeRows({
           <td key={d} className="mc-rate">£{rates[t.id]?.[d] ?? t.basePrice}</td>
         ))}
       </tr>
-      {t.rooms.map((room) => (
-        <tr key={room}>
-          <td className="room-name">Room {room}</td>
-          {renderCells(
-            (date) => typeBookings.filter((b) => b.physicalRoom === room && b.checkIn <= date && date < b.checkOut),
-            { propertyId: g.id, physicalRoom: room, roomTypeId: t.id },
-            true
-          )}
-        </tr>
-      ))}
+      {t.rooms.flatMap((room) => {
+        const roomBookings = typeBookings.filter((b) => b.physicalRoom === room);
+        const fullRoomOcc = (date: string) =>
+          roomBookings.filter((b) => b.checkIn <= date && date < b.checkOut);
+        const lanes = assignLanes(roomBookings);
+        return lanes.map((laneBookings, laneIdx) => (
+          <tr key={`${room}-${laneIdx}`} className={laneIdx > 0 ? 'mc-lane' : undefined}>
+            <td className={laneIdx === 0 ? 'room-name' : 'room-name mc-lane-label'}>
+              {laneIdx === 0 ? `Room ${room}` : ''}
+            </td>
+            {renderCells(
+              (date) => laneBookings.filter((b) => b.checkIn <= date && date < b.checkOut),
+              { propertyId: g.id, physicalRoom: room, roomTypeId: t.id },
+              true,
+              fullRoomOcc
+            )}
+          </tr>
+        ));
+      })}
       {unassigned.length > 0 && (
         <tr>
           <td className="room-name mc-unassigned">⚠ Unassigned ({unassigned.length})</td>
