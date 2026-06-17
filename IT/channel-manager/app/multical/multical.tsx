@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { moveBookingAction, updateBookingAction, quoteAction, cancelBooking, createBooking, sendPaymentLinkAction, syncStripeAction } from '@/lib/actions';
 
@@ -106,8 +106,53 @@ function daysDiff(a: string, b: string) {
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 }
 
-export default function MultiCal({ groups, dates, rates, bookings }: Props) {
+export default function MultiCal({ groups, dates: initDates, rates: initRates, bookings: initBookings }: Props) {
   const router = useRouter();
+  const [dates, setDates] = useState(initDates);
+  const [bookings, setBookings] = useState(initBookings);
+  const [rates, setRates] = useState(initRates);
+  const calWrapRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef(false);
+  const datesRef = useRef(initDates);
+  datesRef.current = dates;
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    const last = datesRef.current[datesRef.current.length - 1];
+    const d = new Date(last + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    const nextStart = d.toISOString().slice(0, 10);
+    try {
+      const res = await fetch(`/api/multical/extend?start=${nextStart}&days=14`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setDates((prev) => [...prev, ...data.dates]);
+      setBookings((prev) => {
+        const seen = new Set(prev.map((b: B) => b.id));
+        return [...prev, ...data.bookings.filter((b: B) => !seen.has(b.id))];
+      });
+      setRates((prev) => {
+        const m = { ...prev };
+        for (const [id, map] of Object.entries(data.rates as Record<string, Record<string, number>>))
+          m[Number(id)] = { ...(m[Number(id)] || {}), ...(map as Record<string, number>) };
+        return m;
+      });
+    } finally {
+      loadingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = calWrapRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 200) loadMore();
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [loadMore]);
+
   const [sel, setSel] = useState<B | null>(null);
   const [edit, setEdit] = useState({
     room: '', ci: '', co: '', guestName: '', email: '', phone: '',
@@ -298,6 +343,7 @@ export default function MultiCal({ groups, dates, rates, bookings }: Props) {
   return (
     <>
       {pending && <div className="mc-saving">Saving…</div>}
+      <div ref={calWrapRef} className="card cal-wrap">
       <table className="cal mc" onMouseLeave={() => setSelDrag(null)}>
         <thead>
           <tr>
@@ -326,6 +372,7 @@ export default function MultiCal({ groups, dates, rates, bookings }: Props) {
           })}
         </tbody>
       </table>
+      </div>
 
       {newBk && (
         <NewBookingModal

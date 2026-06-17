@@ -62,37 +62,31 @@ export default async function MultiCalPage({
           <span><i className="ch-dot ch-other" /> Other/import</span>
         </span>
       </div>
-      <div className="card cal-wrap">
-        <MultiCal
-          groups={groups}
-          dates={dateRange(start, days)}
-          rates={rates}
-          bookings={bookings.map((b) => ({
-            id: b.id,
-            guestName: b.guestName,
-            checkIn: b.checkIn,
-            checkOut: b.checkOut,
-            propertyId: b.propertyId,
-            roomTypeId: b.roomTypeId,
-            physicalRoom: b.physicalRoom,
-            roomTypeName: b.roomTypeName,
-            channel: b.channel,
-            channelRef: b.channelRef,
-            email: b.email,
-            phone: b.phone,
-            adults: b.adults,
-            children: b.children,
-            totalPrice: b.totalPrice,
-            notes: b.notes,
-            stripeStatus: b.stripeStatus,
-            stripePaymentUrl: b.stripePaymentUrl,
-          }))}
-        />
-        <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
-          “⚠ Unassigned” rows sit under their room type — click a stay to allocate/edit it. Red cells =
-          two bookings in the same room that night. Grey row under each type shows the nightly rate.
-        </p>
-      </div>
+      <MultiCal
+        groups={groups}
+        dates={dateRange(start, days)}
+        rates={rates}
+        bookings={bookings.map((b) => ({
+          id: b.id,
+          guestName: b.guestName,
+          checkIn: b.checkIn,
+          checkOut: b.checkOut,
+          propertyId: b.propertyId,
+          roomTypeId: b.roomTypeId,
+          physicalRoom: b.physicalRoom,
+          roomTypeName: b.roomTypeName,
+          channel: b.channel,
+          channelRef: b.channelRef,
+          email: b.email,
+          phone: b.phone,
+          adults: b.adults,
+          children: b.children,
+          totalPrice: b.totalPrice,
+          notes: b.notes,
+          stripeStatus: b.stripeStatus,
+          stripePaymentUrl: b.stripePaymentUrl,
+        }))}
+      />
     </>
   );
 }
