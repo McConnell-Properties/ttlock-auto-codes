@@ -210,3 +210,44 @@ Data sources: Beds24 `/inventory/rooms/availability` (2026-06-17 → 2026-06-24)
 - **Valnay:** 38 failures with note `"wrote 1, read back 0"` are pre-DPR-guard era (stale). 24 are current DPR failures (rooms 693521/693519/693518 have no Daily Price Rule). Fix: add DPRs in Beds24 UI then `node db/queue-inventory.mjs 90 valnay`
 - **Seamless:** 18 open SyncJobs are BDC jobs for the Seamless propertyId — these should not be pushed (Seamless is excluded in the drainer). The 2 failed jobs are legacy (session expired = old Playwright bot). The 18 open jobs may need manual cleanup.
 - **0 open SyncJobs on Streatham/Tooting/Gassiot/Valnay** — drainer is current; queue drains promptly (DPR failures are immediately marked failed, not stuck pending)
+
+---
+
+## 2026-06-17 · REPORT · Live e2e sync test — BLOCKED on DPR precondition
+
+**Requested test room:** BDC room 1471588604 → CMS roomTypeId=6 "Twin Room, with full private kitchen and ensuite" → beds24RoomId=693500, property=Streatham Rooms
+
+### Step 1 — Room map ✓
+
+| Field | Value |
+|---|---|
+| BDC room ID | 1471588604 |
+| CMS roomTypeId | 6 |
+| CMS name | Twin Room, with full private kitchen and ensuite |
+| beds24RoomId | 693500 |
+| Property | Streatham Rooms (bdcHotelId=14715886) |
+| totalUnits | 1 |
+
+### Step 2 — DPR check: FAILED ✗
+
+DPR probe: POST numAvail=1 to room 693500 on 2026-07-01 (safe probe date). Response was `{"success":true}` with no `modified` field at all — numAvail silently dropped.
+
+**Full Streatham DPR survey** (batch probe, 2026-08-01):
+
+| beds24RoomId | BDC room ID | DPR |
+|---|---|---|
+| 693499 | 1471588601 | ✓ YES |
+| 693500 | 1471588604 | MISSING |
+| 693501 | 1471588605 | MISSING |
+| 693502 | 1471588609 | MISSING |
+| 693503 | 1471588610 | MISSING |
+| 693504 | 1471588611 | MISSING |
+| 693505 | 1471588612 | MISSING |
+
+**Only 693499 has a DPR** across all 7 Streatham rooms. The test was stopped here — proceeding without a DPR would queue a SyncJob and fire the drainer, but numAvail would be silently dropped and BDC would not close.
+
+### Status: awaiting Charlie
+
+Two paths:
+1. **Substitute:** re-run test on BDC room `1471588601` (beds24RoomId=693499, "Double room - Ensuite") — only Streatham room with confirmed DPR, same push path, proves the sync end-to-end
+2. **Fix first:** add Daily Price Rule for room 693500 in Beds24 UI (Properties → that room → Daily Price Rules tab), then re-run original test
