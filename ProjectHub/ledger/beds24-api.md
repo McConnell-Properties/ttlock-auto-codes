@@ -348,3 +348,85 @@ Identical pattern to 693518. `{"success":true}` only — no `modified`, no diagn
 **Root cause is a Beds24-side per-room configuration.** The split in Valnay alone (693520 accepts, 693518 drops) proves it is not a property-level setting, not a timing issue, and not a channel-open/closed issue. Something is set differently on 693520 that is not set on the failing rooms.
 
 **Recommended next step (DESKTOP):** In Beds24 UI, open 693520 (working) and 693518 (failing) side-by-side. Compare: Room Settings → Availability type / Sell mode, and the Daily Price Rules tab. The setting that differs between them is the root cause. Once identified, apply to all failing rooms and re-run `node db/queue-inventory.mjs 90 valnay` + live push.
+
+---
+
+## 2026-06-17 · REPORT · Config diff — 693520 (works) vs 693518/693503 (fails)
+
+**Goal:** Find the API-visible field that distinguishes 693520 (accepts numAvail) from 693518/693503 (drops numAvail), and cross-check 693503 as confirmation.
+
+### Method
+
+1. `GET /properties?id=335063&includeAllRooms=true` (Valnay) — extracted `roomTypes` array
+2. `GET /properties?id=335059&includeAllRooms=true` (Streatham) — extracted `roomTypes` array
+3. Deep-flattened all three room objects to leaf paths; diffed every field
+
+### Diff result — fields that differ between any of the three rooms
+
+| Field | 693520 (works) | 693518 (fails) | 693503 (fails) |
+|---|---|---|---|
+| `id` | 693520 | 693518 | 693503 |
+| `qty` | **3** | **1** | **2** |
+| `roomSize` | 14 | 10 | 30 |
+| `roomType` | double | double | triple |
+| `name` | Double Room Shared Bath | Double Room Shared Bath | Triple Room Private Bath |
+| `maxPeople` | 2 | 2 | 3 |
+| `maxAdult` | 2 | 2 | 3 |
+| `propertyId` | 335063 | 335063 | 335059 |
+| `units` (array) | 3 entries | 1 entry | 2 entries |
+| `featureCodes` | (same as 693518) | (same as 693520) | (different — different room) |
+
+All other fields — `overbookingProtection`, `controlPriority`, `sellPriority`, `unitAllocation`, `dependencies.*`, `restrictionStrategy`, `blockAfterCheckOutDays`, all `templates.*`, `includeInReports` — are **identical** across all three rooms.
+
+**Between 693520 and 693518 (same property, same room type name), the only meaningful difference is `qty: 3` vs `qty: 1`.** `roomSize` and `units` length are cosmetic / derived.
+
+### DPR / price-rule endpoint search
+
+No Beds24 v2 endpoint exposes DPR (Daily Price Rule) or sell-mode configuration. All candidates probed:
+
+| Endpoint | Result |
+|---|---|
+| `GET /inventory/rooms/pricerules` | 500 Could not process request |
+| `GET /inventory/rooms/offers` | 400 Required parameter arrival missing |
+| `GET /inventory/offers` | 404 Invalid URI element |
+| `GET /priceRules` | 404 Invalid URI element |
+| `GET /inventory/offers?arrival=…&departure=…&roomId=…` | 400 Occupancy not defined |
+| `GET /inventory/rooms/calendar` (GET, not POST) | Returns `{roomId, name, calendar:[]}` — no config fields |
+| `GET /inventory/rooms?roomId=X` | 500 Could not process request |
+
+The DPR configuration is not queryable via the Beds24 v2 API.
+
+### Correction: earlier batch probe false positive
+
+The earlier "Streatham DPR survey" reported `beds24RoomId=693499 | DPR: YES ✓`. **This was a false positive.** Individual probes on both 2026-07-01 and 2026-08-01 confirm 693499 drops numAvail with `{"success":true}` and no `modified`. Re-running the same batch on 2026-08-01 now also returns `{"success":true}` (no `modified`) for all 7 Streatham rooms. The earlier batch was likely affected by index ambiguity in the response ordering.
+
+### Confirmed numAvail acceptance status across all tested rooms
+
+| beds24RoomId | Property | qty | Accepts numAvail | Evidence |
+|---|---|---|---|---|
+| 693520 | Valnay | 3 | **YES** | `modified.calendar[numAvail:1]` on 2026-07-01 and 2026-08-01 |
+| 693518 | Valnay | 1 | NO | `{"success":true}` only, both dates |
+| 693503 | Streatham | 2 | NO | `{"success":true}` only, both dates |
+| 693499 | Streatham | 2 | NO | `{"success":true}` only (individual probes — earlier batch result was false positive) |
+| 693500–693505 | Streatham | 1–2 | NO | Batch probe confirmed, all `{"success":true}` no `modified` |
+
+**693520 is the only room across all tested rooms that accepts numAvail pushes.**
+
+### Root cause: `qty` is the only API-visible differentiator — but causality is uncertain
+
+The only structural difference the API exposes between 693520 (works) and every failing room is `qty: 3`. 693520 is also the only room with `qty > 2` in the tested set. Two interpretations:
+
+1. **`qty` is causal:** Beds24 only accepts external numAvail for rooms with 3+ physical units — the reasoning would be that single/dual-unit rooms are always "manageable" from Beds24's own booking count, so it ignores external availability pushes for them.
+
+2. **`qty` is coincidental:** 693520 happens to be the only room with a DPR/sell-mode config set (enabling external availability pushes), and it also happens to be the only room with 3 units. The two are independent — the DPR was set up separately and the qty reflects actual physical room count.
+
+**The API cannot distinguish these interpretations.** No DPR config endpoint exists to verify.
+
+### Recommended action (DESKTOP)
+
+Open 693520 (working) and 693518 (failing) in Beds24 UI simultaneously. Look for any setting that exists on 693520 but not 693518 — specifically:
+- Room Settings → any "Availability" or "Sell" or "Channel" mode flag
+- Room Settings → "Rooms to sell" field (if present): check if it's set to "use external" vs "auto"
+- Daily Price Rules tab: does 693520 have a rule and 693518 doesn't?
+
+If qty is the causal factor, setting 693518/693503 to `qty: 3` (or whatever the real unit count is) should fix the drops. If a DPR is missing, adding one should fix it. Either way, the fix is the same Beds24 UI action; this report gives the exact rooms to compare.
