@@ -36,7 +36,7 @@ UID_NUM="$(id -u)"
 
 chmod +x "$RUN" "$HERE/jobs/"*.sh
 
-JOBS=(reservation-import email-watch booking-emails stripe-sync import-extras db-backup poll-ttlock-arrivals sync-inventory)
+JOBS=(reservation-import email-watch booking-emails stripe-sync import-extras db-backup poll-ttlock-arrivals beds24-pull beds24-push)
 
 plist_path() { echo "$LA/$PREFIX.$1.plist"; }
 
@@ -72,10 +72,6 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
   && { [ -d node_modules/imapflow ] || npm install --no-audit --no-fund; } \
   && node db/migrate-email-tasks.mjs )
 
-# one-time deps for sync-inventory (Playwright + Chromium browser binary)
-( cd "$APP" \
-  && { [ -d node_modules/playwright ] || npm install --no-audit --no-fund playwright; } \
-  && node_modules/.bin/playwright install chromium 2>/dev/null ) || true
 
 # write_plist <name> <trigger-xml> <cmd...>
 # <trigger-xml> is a complete plist fragment (its own <key>s), so jobs can mix
@@ -144,7 +140,8 @@ write_plist stripe-sync          "$(every 5)"                          node "$AP
 write_plist import-extras        "$(every 15)"                         node "$APP/db/import-extras.mjs"
 write_plist db-backup            "$(daily 4 0)"                        node "$APP/db/backup.mjs"
 write_plist poll-ttlock-arrivals "$(at 9 0 17 0)"                     /bin/bash "$HERE/jobs/poll-ttlock-arrivals.sh"
-write_plist sync-inventory       "$(watch_file "$SYNC_SENTINEL" 6 0)" node "$APP/scripts/sync-inventory.mjs"
+write_plist beds24-pull          "$(every 15)"                         /bin/bash "$HERE/jobs/beds24-pull.sh"
+write_plist beds24-push          "$(every 10)"                         /bin/bash "$HERE/jobs/beds24-push.sh"
 
 for j in "${JOBS[@]}"; do
   unload_job "$j"
