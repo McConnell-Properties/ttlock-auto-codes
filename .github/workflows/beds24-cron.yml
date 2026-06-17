@@ -14,10 +14,13 @@ jobs:
     steps:
       - name: POST /api/beds24/cron/push
         run: |
-          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+          RESPONSE=$(curl -sS -w '\n%{http_code}' -X POST \
             "${{ vars.VERCEL_URL }}/api/beds24/cron/push" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          STATUS=$(printf '%s' "$RESPONSE" | tail -1)
+          BODY=$(printf '%s' "$RESPONSE" | head -n -1)
           echo "HTTP $STATUS"
+          echo "$BODY"
           [ "$STATUS" = "200" ] || exit 1
 
   pull:
@@ -28,10 +31,13 @@ jobs:
     steps:
       - name: POST /api/beds24/cron/pull
         run: |
-          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+          RESPONSE=$(curl -sS -w '\n%{http_code}' -X POST \
             "${{ vars.VERCEL_URL }}/api/beds24/cron/pull" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          STATUS=$(printf '%s' "$RESPONSE" | tail -1)
+          BODY=$(printf '%s' "$RESPONSE" | head -n -1)
           echo "HTTP $STATUS"
+          echo "$BODY"
           [ "$STATUS" = "200" ] || exit 1
 
   sync-bookings:
@@ -42,8 +48,11 @@ jobs:
     steps:
       - name: POST /api/beds24/cron/sync-bookings
         run: |
-          STATUS=$(curl -fsS -o /dev/null -w '%{http_code}' -X POST \
+          RESPONSE=$(curl -sS -w '\n%{http_code}' -X POST \
             "${{ vars.VERCEL_URL }}/api/beds24/cron/sync-bookings" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          STATUS=$(printf '%s' "$RESPONSE" | tail -1)
+          BODY=$(printf '%s' "$RESPONSE" | head -n -1)
           echo "HTTP $STATUS"
+          echo "$BODY"
           [ "$STATUS" = "200" ] || exit 1

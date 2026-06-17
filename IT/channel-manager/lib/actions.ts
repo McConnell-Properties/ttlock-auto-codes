@@ -283,6 +283,12 @@ export async function updateExtrasAction(id: number, taskStatus: string) {
   revalidatePath('/crm');
 }
 
+export async function updateExtraAction(id: number, fields: { taskStatus: string }) {
+  await data.setExtrasTaskStatus(id, fields.taskStatus);
+  revalidatePath('/crm');
+  revalidatePath('/tasks');
+}
+
 export async function markSyncJob(id: number, status: 'done' | 'failed', note?: string) {
   await data.setSyncJobStatus(id, status, note);
   revalidatePath('/sync');

@@ -12,7 +12,11 @@ export async function middleware(req: NextRequest) {
   if (!process.env.ADMIN_PASSWORD) return NextResponse.next(); // auth disabled (local dev)
 
   const { pathname } = req.nextUrl;
-  if (pathname === '/login' || pathname === '/api/stripe/webhook') {
+  if (
+    pathname === '/login' ||
+    pathname === '/api/stripe/webhook' ||
+    pathname.startsWith('/api/beds24/cron/')
+  ) {
     return NextResponse.next();
   }
 

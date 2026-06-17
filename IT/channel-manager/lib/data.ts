@@ -918,3 +918,94 @@ export async function queuePriceSync(roomTypeId: number, dates: string[], price:
     }
   }
 }
+
+// ---------- portal / tasks helpers ----------
+
+export function extrasForBooking(bookingId: number) {
+  return all<ExtrasTask>(
+    `SELECT e.*, b.guestName, p.name AS propertyName, b.physicalRoom, b.checkIn, b.checkOut
+     FROM ExtrasRequest e
+     LEFT JOIN Booking b ON b.id = e.bookingId
+     LEFT JOIN Property p ON p.id = b.propertyId
+     WHERE e.bookingId = ?
+     ORDER BY COALESCE(e.date, b.checkIn), e.id`,
+    [bookingId]
+  );
+}
+
+export function extrasForDate(date: string) {
+  return all<ExtrasTask & { billing: string; addedBy: string }>(
+    `SELECT e.*,
+            COALESCE(e.billing, '') AS billing,
+            COALESCE(e.addedBy, '') AS addedBy,
+            b.guestName, p.name AS propertyName, b.physicalRoom, b.checkIn, b.checkOut
+     FROM ExtrasRequest e
+     LEFT JOIN Booking b ON b.id = e.bookingId
+     LEFT JOIN Property p ON p.id = b.propertyId
+     WHERE e.date = ? OR (e.date IS NULL AND b.checkIn = ?)
+     ORDER BY e.id`,
+    [date, date]
+  );
+}
+
+export type BookingFull = Booking & {
+  roomTypeName: string | null;
+  propertyName: string | null;
+  crm: Partial<CrmRecord> | null;
+};
+
+export async function findBookingFullByRef(ref: string): Promise<BookingFull | null> {
+  const row = await one<Booking & { roomTypeName: string | null; propertyName: string | null }>(
+    `SELECT b.*, rt.name AS roomTypeName, p.name AS propertyName
+     FROM Booking b
+     LEFT JOIN RoomType rt ON rt.id = b.roomTypeId
+     LEFT JOIN Property p  ON p.id  = b.propertyId
+     WHERE b.channelRef = ? LIMIT 1`,
+    [ref]
+  );
+  if (!row) return null;
+  const crm = await one<Partial<CrmRecord>>(
+    `SELECT * FROM CrmRecord WHERE bookingId = ? LIMIT 1`, [row.id]
+  );
+  return { ...row, crm: crm ?? null };
+}
+
+export function findBookingByGuestDetails(
+  firstName: string,
+  lastName: string,
+  checkIn: string,
+  checkOut: string
+) {
+  const fullName = `${firstName} ${lastName}`.trim();
+  return one<{ id: number; channelRef: string | null }>(
+    `SELECT id, channelRef FROM Booking
+     WHERE guestName LIKE ? AND checkIn = ? AND checkOut = ? AND status = 'confirmed'
+     LIMIT 1`,
+    [`%${fullName}%`, checkIn, checkOut]
+  );
+}
+
+export function upcomingBookingsWithDeposit() {
+  return all<Booking & { roomTypeName: string | null; propertyName: string | null }>(
+    `SELECT b.*, rt.name AS roomTypeName, p.name AS propertyName
+     FROM Booking b
+     LEFT JOIN RoomType rt ON rt.id = b.roomTypeId
+     LEFT JOIN Property p  ON p.id  = b.propertyId
+     WHERE b.status = 'confirmed' AND b.checkIn >= date('now')
+       AND b.totalPrice IS NOT NULL AND b.totalPrice > 0
+     ORDER BY b.checkIn`
+  );
+}
+
+export async function markBookingBySession(
+  sessionId: string,
+  status: 'paid' | 'expired'
+): Promise<number> {
+  const rs = await run(
+    `UPDATE Booking SET stripeStatus = ?,
+       paidAt = CASE WHEN ? = 'paid' THEN CURRENT_TIMESTAMP ELSE paidAt END
+     WHERE stripeSessionId = ?`,
+    [status, status, sessionId]
+  );
+  return Number(rs.rowsAffected ?? 0);
+}
