@@ -311,12 +311,25 @@ function writeRequestsSync(all: ExtraRequest[]) {
 
 async function tursoAddRequest(req: ExtraRequest): Promise<void> {
   const db = tursoDb()!;
+  // Confirmed (incl. free) extras are immediately visible on the CM extras-cal;
+  // pending-payment entries are only promoted once payment clears.
+  const cmStatus = req.status === 'pending-payment' ? 'pending' : 'paid';
   try {
-    await db.execute({
-      sql: `INSERT INTO GuestExtraRequest (id, ref, guestName, extraId, extraName, date, time, nights, price, status, stripeSession, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [req.id, req.ref, req.guestName, req.extraId, req.extraName, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, req.status, req.stripeSession ?? null, req.createdAt],
-    });
+    await db.batch([
+      {
+        sql: `INSERT INTO GuestExtraRequest (id, ref, guestName, extraId, extraName, date, time, nights, price, status, stripeSession, createdAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [req.id, req.ref, req.guestName, req.extraId, req.extraName, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, req.status, req.stripeSession ?? null, req.createdAt],
+      },
+      // Mirror into ExtrasRequest so the CM extras-cal shows portal bookings.
+      // INSERT OR IGNORE — dedup key is (bookingReference, extra, date, time).
+      {
+        sql: `INSERT OR IGNORE INTO ExtrasRequest (bookingReference, bookingId, extra, date, time, nights, price, sourceStatus, raw)
+              SELECT ?, b.id, ?, ?, ?, ?, ?, ?, ?
+              FROM Booking b WHERE b.channelRef = ? COLLATE NOCASE LIMIT 1`,
+        args: [req.ref, req.extraId, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, cmStatus, JSON.stringify({ extraName: req.extraName, portalId: req.id }), req.ref],
+      },
+    ], 'write');
   } finally {
     db.close();
   }
@@ -336,6 +349,15 @@ async function tursoMarkPaid(stripeSession: string, all = false): Promise<ExtraR
       args: [stripeSession],
     });
     const rows = rs.rows.map(rowToExtraRequest);
+    // Promote the CM mirror rows to 'paid' so they appear on the extras-cal.
+    for (const r of rows) {
+      await db.execute({
+        sql: `UPDATE ExtrasRequest SET sourceStatus = 'paid'
+              WHERE bookingReference = ? AND extra = ?
+                AND COALESCE(date,'') = COALESCE(?,'') AND COALESCE(time,'') = COALESCE(?,'')`,
+        args: [r.ref, r.extraId, r.date ?? null, r.time ?? null],
+      });
+    }
     return all ? rows : (rows[0] ?? null);
   } finally {
     db.close();
