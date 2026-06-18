@@ -21,3 +21,15 @@ build/
 .DS_Store
 *.db
 *.db-journal
+
+# DB backups — large binaries, not for version control
+IT/channel-manager/db/backups/
+
+# Generated Office docs
+*.docx
+
+# Browser profile used for BDC testing — never commit
+IT/channel-manager/.bdc-profile/
+
+# Diagnostic / temp scripts
+IT/channel-manager/_diag_tmp.mjs

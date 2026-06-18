@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mcconnell.beds24.daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <!-- EDIT this path if you move the folder -->
+    <string>/Users/charliemcconnell/ttlock-auto-codes/beds24-cms/run.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/charliemcconnell/ttlock-auto-codes/beds24-cms</string>
+
+  <!-- Run every morning at 06:30 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+
+  <!-- Also catch up if the Mac was asleep at 06:30 -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/charliemcconnell/ttlock-auto-codes/beds24-cms/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charliemcconnell/ttlock-auto-codes/beds24-cms/logs/launchd.err.log</string>
+</dict>
+</plist>

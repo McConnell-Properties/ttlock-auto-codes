@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Beds24 Channel Dashboard</title>
+<script src="vendor/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744;
+    --text:#e6edf3; --muted:#8b98a5; --accent:#4f9cf9; --green:#3fb950;
+    --red:#f85149; --amber:#d29922; --chip:#2d3742;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--text);font-size:14px}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;
+         align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  header h1{font-size:18px;margin:0;font-weight:600}
+  header .meta{color:var(--muted);font-size:12px}
+  .tabs{display:flex;gap:4px;padding:12px 24px 0;flex-wrap:wrap}
+  .tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);
+       border:1px solid transparent;border-bottom:none;user-select:none}
+  .tab.active{background:var(--panel);color:var(--text);border-color:var(--line)}
+  main{padding:20px 24px 60px}
+  .view{display:none}
+  .view.active{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .card .value{font-size:26px;font-weight:600;margin-top:6px}
+  .card .sub{color:var(--muted);font-size:12px;margin-top:4px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:20px}
+  .panel h2{font-size:14px;margin:0 0 14px;font-weight:600;color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+  tr:hover td{background:var(--panel2)}
+  .chip{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--chip);font-size:11px}
+  .pos{color:var(--green)} .neg{color:var(--red)} .num{text-align:right;font-variant-numeric:tabular-nums}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+  canvas{max-height:320px}
+  .muted{color:var(--muted)}
+  .pill{font-size:11px;padding:1px 7px;border-radius:6px}
+  .pill.confirmed{background:rgba(63,185,80,.15);color:var(--green)}
+  .pill.new{background:rgba(79,156,249,.15);color:var(--accent)}
+  .pill.request{background:rgba(210,153,34,.15);color:var(--amber)}
+  .pill.cancelled,.pill.black{background:rgba(248,81,73,.12);color:var(--red)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Beds24 Channel Dashboard</h1>
+  <div class="meta">
+    Data fetched: <span id="lastFetch"></span> · Built: <span id="builtAt"></span> · <span id="propCount"></span>
+  </div>
+</header>
+<div class="tabs">
+  <div class="tab active" data-view="occupancy">Occupancy &amp; Calendar</div>
+  <div class="tab" data-view="revenue">Revenue &amp; RevPAR</div>
+  <div class="tab" data-view="feed">Bookings Feed</div>
+  <div class="tab" data-view="pace">Pace &amp; Pickup</div>
+</div>
+<main>
+  <!-- OCCUPANCY -->
+  <section class="view active" id="view-occupancy">
+    <div class="cards" id="occCards"></div>
+    <div class="panel"><h2>Monthly occupancy</h2><canvas id="occChart"></canvas></div>
+  </section>
+  <!-- REVENUE -->
+  <section class="view" id="view-revenue">
+    <div class="cards" id="revCards"></div>
+    <div class="grid2">
+      <div class="panel"><h2>Monthly revenue &amp; RevPAR</h2><canvas id="revChart"></canvas></div>
+      <div class="panel"><h2>Channel mix (revenue, YTD)</h2><canvas id="chanChart"></canvas></div>
+    </div>
+    <div class="panel"><h2>Channel breakdown (YTD)</h2>
+      <table id="chanTable"><thead><tr><th>Channel</th><th class="num">Bookings</th>
+      <th class="num">Nights</th><th class="num">Revenue</th><th class="num">Share</th></tr></thead>
+      <tbody></tbody></table>
+    </div>
+  </section>
+  <!-- FEED -->
+  <section class="view" id="view-feed">
+    <div class="panel"><h2>Upcoming &amp; recent bookings</h2>
+      <table id="feedTable"><thead><tr><th>Arrival</th><th>Guest</th><th>Property</th>
+      <th>Nights</th><th>Channel</th><th class="num">Value</th><th>Status</th></tr></thead>
+      <tbody></tbody></table>
+    </div>
+  </section>
+  <!-- PACE -->
+  <section class="view" id="view-pace">
+    <div class="cards" id="paceCards"></div>
+    <div class="grid2">
+      <div class="panel"><h2>On-the-books: next 90 days vs last year</h2><canvas id="paceChart"></canvas></div>
+      <div class="panel"><h2>Booking lead time</h2><canvas id="leadChart"></canvas></div>
+    </div>
+  </section>
+</main>
+<script>
+const DATA = {"generated_at": "2026-06-16T00:16:15", "last_fetch": "2026-06-16T00:14:51", "currency": "\u00a3", "properties": [{"id": 101, "name": "Streatham Apartment"}, {"id": 102, "name": "Tooting Studio"}, {"id": 103, "name": "Gassiot House"}, {"id": 104, "name": "Valnay Flat"}], "room_capacity": 4, "kpi_this_month": {"period_start": "2026-06-01", "period_end": "2026-07-01", "available_room_nights": 120, "sold_room_nights": 38, "occupancy": 0.3167, "revenue": 5040.0, "adr": 132.63, "revpar": 42.0}, "kpi_next_30": {"period_start": "2026-06-16", "period_end": "2026-07-16", "available_room_nights": 120, "sold_room_nights": 46, "occupancy": 0.3833, "revenue": 6015.0, "adr": 130.76, "revpar": 50.12}, "kpi_next_90": {"period_start": "2026-06-16", "period_end": "2026-09-14", "available_room_nights": 360, "sold_room_nights": 112, "occupancy": 0.3111, "revenue": 13400.0, "adr": 119.64, "revpar": 37.22}, "monthly": [{"period_start": "2025-06-01", "period_end": "2025-07-01", "available_room_nights": 120, "sold_room_nights": 17, "occupancy": 0.1417, "revenue": 1850.0, "adr": 108.82, "revpar": 15.42, "label": "Jun 2025", "month": "2025-06-01"}, {"period_start": "2025-07-01", "period_end": "2025-08-01", "available_room_nights": 124, "sold_room_nights": 36, "occupancy": 0.2903, "revenue": 4085.0, "adr": 113.47, "revpar": 32.94, "label": "Jul 2025", "month": "2025-07-01"}, {"period_start": "2025-08-01", "period_end": "2025-09-01", "available_room_nights": 124, "sold_room_nights": 31, "occupancy": 0.25, "revenue": 3930.0, "adr": 126.77, "revpar": 31.69, "label": "Aug 2025", "month": "2025-08-01"}, {"period_start": "2025-09-01", "period_end": "2025-10-01", "available_room_nights": 120, "sold_room_nights": 39, "occupancy": 0.325, "revenue": 5095.0, "adr": 130.64, "revpar": 42.46, "label": "Sep 2025", "month": "2025-09-01"}, {"period_start": "2025-10-01", "period_end": "2025-11-01", "available_room_nights": 124, "sold_room_nights": 32, "occupancy": 0.2581, "revenue": 4020.0, "adr": 125.62, "revpar": 32.42, "label": "Oct 2025", "month": "2025-10-01"}, {"period_start": "2025-11-01", "period_end": "2025-12-01", "available_room_nights": 120, "sold_room_nights": 57, "occupancy": 0.475, "revenue": 7090.0, "adr": 124.39, "revpar": 59.08, "label": "Nov 2025", "month": "2025-11-01"}, {"period_start": "2025-12-01", "period_end": "2026-01-01", "available_room_nights": 124, "sold_room_nights": 34, "occupancy": 0.2742, "revenue": 4405.0, "adr": 129.56, "revpar": 35.52, "label": "Dec 2025", "month": "2025-12-01"}, {"period_start": "2026-01-01", "period_end": "2026-02-01", "available_room_nights": 124, "sold_room_nights": 46, "occupancy": 0.371, "revenue": 5405.0, "adr": 117.5, "revpar": 43.59, "label": "Jan 2026", "month": "2026-01-01"}, {"period_start": "2026-02-01", "period_end": "2026-03-01", "available_room_nights": 112, "sold_room_nights": 33, "occupancy": 0.2946, "revenue": 3510.0, "adr": 106.36, "revpar": 31.34, "label": "Feb 2026", "month": "2026-02-01"}, {"period_start": "2026-03-01", "period_end": "2026-04-01", "available_room_nights": 124, "sold_room_nights": 52, "occupancy": 0.4194, "revenue": 6035.0, "adr": 116.06, "revpar": 48.67, "label": "Mar 2026", "month": "2026-03-01"}, {"period_start": "2026-04-01", "period_end": "2026-05-01", "available_room_nights": 120, "sold_room_nights": 21, "occupancy": 0.175, "revenue": 2570.0, "adr": 122.38, "revpar": 21.42, "label": "Apr 2026", "month": "2026-04-01"}, {"period_start": "2026-05-01", "period_end": "2026-06-01", "available_room_nights": 124, "sold_room_nights": 57, "occupancy": 0.4597, "revenue": 6835.0, "adr": 119.91, "revpar": 55.12, "label": "May 2026", "month": "2026-05-01"}, {"period_start": "2026-06-01", "period_end": "2026-07-01", "available_room_nights": 120, "sold_room_nights": 38, "occupancy": 0.3167, "revenue": 5040.0, "adr": 132.63, "revpar": 42.0, "label": "Jun 2026", "month": "2026-06-01"}, {"period_start": "2026-07-01", "period_end": "2026-08-01", "available_room_nights": 124, "sold_room_nights": 37, "occupancy": 0.2984, "revenue": 4370.0, "adr": 118.11, "revpar": 35.24, "label": "Jul 2026", "month": "2026-07-01"}, {"period_start": "2026-08-01", "period_end": "2026-09-01", "available_room_nights": 124, "sold_room_nights": 38, "occupancy": 0.3065, "revenue": 4350.0, "adr": 114.47, "revpar": 35.08, "label": "Aug 2026", "month": "2026-08-01"}, {"period_start": "2026-09-01", "period_end": "2026-10-01", "available_room_nights": 120, "sold_room_nights": 48, "occupancy": 0.4, "revenue": 5125.0, "adr": 106.77, "revpar": 42.71, "label": "Sep 2026", "month": "2026-09-01"}, {"period_start": "2026-10-01", "period_end": "2026-11-01", "available_room_nights": 124, "sold_room_nights": 25, "occupancy": 0.2016, "revenue": 2790.0, "adr": 111.6, "revpar": 22.5, "label": "Oct 2026", "month": "2026-10-01"}, {"period_start": "2026-11-01", "period_end": "2026-12-01", "available_room_nights": 120, "sold_room_nights": 0, "occupancy": 0.0, "revenue": 0.0, "adr": 0.0, "revpar": 0.0, "label": "Nov 2026", "month": "2026-11-01"}, {"period_start": "2026-12-01", "period_end": "2027-01-01", "available_room_nights": 124, "sold_room_nights": 0, "occupancy": 0.0, "revenue": 0.0, "adr": 0.0, "revpar": 0.0, "label": "Dec 2026", "month": "2026-12-01"}], "channel_mix": [{"channel": "Booking.com", "bookings": 45, "nights": 153, "revenue": 18215.0}, {"channel": "Airbnb", "bookings": 48, "nights": 156, "revenue": 17710.0}, {"channel": "Vrbo", "bookings": 15, "nights": 52, "revenue": 6125.0}, {"channel": "Direct", "bookings": 11, "nights": 34, "revenue": 3980.0}], "pace": {"window_days": 90, "this_year": {"bookings": 32, "sold_room_nights": 112, "revenue": 13400.0}, "last_year": {"bookings": 29, "sold_room_nights": 99, "revenue": 11895.0}, "revenue_delta": 1505.0, "revenue_delta_pct": 12.7}, "lead_time": {"0-7d": 41, "8-30d": 54, "31-90d": 72, "91d+": 21, "unknown": 0}, "feed": [{"id": 156, "guest": "Robin Smith", "property_id": 101, "arrival": "2026-06-04", "departure": "2026-06-07", "nights": 3, "price": 330.0, "channel": "Airbnb", "status": "confirmed", "days_until": -12, "property": "Streatham Apartment"}, {"id": 157, "guest": "Robin Patel", "property_id": 102, "arrival": "2026-06-05", "departure": "2026-06-07", "nights": 2, "price": 240.0, "channel": "Booking.com", "status": "new", "days_until": -11, "property": "Tooting Studio"}, {"id": 158, "guest": "Chris Khan", "property_id": 103, "arrival": "2026-06-08", "departure": "2026-06-10", "nights": 2, "price": 320.0, "channel": "Airbnb", "status": "new", "days_until": -8, "property": "Gassiot House"}, {"id": 159, "guest": "Pat Jones", "property_id": 102, "arrival": "2026-06-09", "departure": "2026-06-11", "nights": 2, "price": 190.0, "channel": "Airbnb", "status": "confirmed", "days_until": -7, "property": "Tooting Studio"}, {"id": 160, "guest": "Pat Jones", "property_id": 101, "arrival": "2026-06-10", "departure": "2026-06-12", "nights": 2, "price": 220.0, "channel": "Booking.com", "status": "new", "days_until": -6, "property": "Streatham Apartment"}, {"id": 161, "guest": "Alex Smith", "property_id": 103, "arrival": "2026-06-11", "departure": "2026-06-13", "nights": 2, "price": 240.0, "channel": "Airbnb", "status": "confirmed", "days_until": -5, "property": "Gassiot House"}, {"id": 162, "guest": "Sam Patel", "property_id": 102, "arrival": "2026-06-16", "departure": "2026-06-20", "nights": 4, "price": 640.0, "channel": "Booking.com", "status": "cancelled", "days_until": 0, "property": "Tooting Studio"}, {"id": 163, "guest": "Chris Jones", "property_id": 103, "arrival": "2026-06-17", "departure": "2026-06-19", "nights": 2, "price": 320.0, "channel": "Booking.com", "status": "confirmed", "days_until": 1, "property": "Gassiot House"}, {"id": 164, "guest": "Robin Khan", "property_id": 103, "arrival": "2026-06-18", "departure": "2026-06-19", "nights": 1, "price": 85.0, "channel": "Booking.com", "status": "cancelled", "days_until": 2, "property": "Gassiot House"}, {"id": 165, "guest": "Alex Brown", "property_id": 101, "arrival": "2026-06-20", "departure": "2026-06-27", "nights": 7, "price": 1120.0, "channel": "Airbnb", "status": "confirmed", "days_until": 4, "property": "Streatham Apartment"}, {"id": 166, "guest": "Alex Patel", "property_id": 104, "arrival": "2026-06-21", "departure": "2026-06-23", "nights": 2, "price": 320.0, "channel": "Booking.com", "status": "confirmed", "days_until": 5, "property": "Valnay Flat"}, {"id": 167, "guest": "Jo Khan", "property_id": 103, "arrival": "2026-06-23", "departure": "2026-06-27", "nights": 4, "price": 480.0, "channel": "Booking.com", "status": "confirmed", "days_until": 7, "property": "Gassiot House"}, {"id": 168, "guest": "Alex Khan", "property_id": 102, "arrival": "2026-06-25", "departure": "2026-06-27", "nights": 2, "price": 170.0, "channel": "Booking.com", "status": "cancelled", "days_until": 9, "property": "Tooting Studio"}, {"id": 169, "guest": "Sam Smith", "property_id": 102, "arrival": "2026-06-29", "departure": "2026-07-06", "nights": 7, "price": 980.0, "channel": "Airbnb", "status": "new", "days_until": 13, "property": "Tooting Studio"}, {"id": 170, "guest": "Jo Jones", "property_id": 103, "arrival": "2026-07-02", "departure": "2026-07-03", "nights": 1, "price": 85.0, "channel": "Booking.com", "status": "confirmed", "days_until": 16, "property": "Gassiot House"}, {"id": 171, "guest": "Jo Lee", "property_id": 101, "arrival": "2026-07-03", "departure": "2026-07-08", "nights": 5, "price": 475.0, "channel": "Direct", "status": "new", "days_until": 17, "property": "Streatham Apartment"}, {"id": 172, "guest": "Chris Brown", "property_id": 102, "arrival": "2026-07-04", "departure": "2026-07-08", "nights": 4, "price": 560.0, "channel": "Booking.com", "status": "confirmed", "days_until": 18, "property": "Tooting Studio"}, {"id": 173, "guest": "Alex Jones", "property_id": 101, "arrival": "2026-07-06", "departure": "2026-07-11", "nights": 5, "price": 550.0, "channel": "Airbnb", "status": "confirmed", "days_until": 20, "property": "Streatham Apartment"}, {"id": 174, "guest": "Jo Jones", "property_id": 102, "arrival": "2026-07-09", "departure": "2026-07-13", "nights": 4, "price": 480.0, "channel": "Airbnb", "status": "confirmed", "days_until": 23, "property": "Tooting Studio"}, {"id": 175, "guest": "Robin Jones", "property_id": 104, "arrival": "2026-07-10", "departure": "2026-07-13", "nights": 3, "price": 420.0, "channel": "Booking.com", "status": "new", "days_until": 24, "property": "Valnay Flat"}, {"id": 176, "guest": "Robin Brown", "property_id": 101, "arrival": "2026-07-11", "departure": "2026-07-15", "nights": 4, "price": 440.0, "channel": "Airbnb", "status": "request", "days_until": 25, "property": "Streatham Apartment"}, {"id": 177, "guest": "Alex Brown", "property_id": 102, "arrival": "2026-07-14", "departure": "2026-07-15", "nights": 1, "price": 140.0, "channel": "Airbnb", "status": "confirmed", "days_until": 28, "property": "Tooting Studio"}, {"id": 178, "guest": "Pat Jones", "property_id": 101, "arrival": "2026-07-15", "departure": "2026-07-18", "nights": 3, "price": 255.0, "channel": "Booking.com", "status": "confirmed", "days_until": 29, "property": "Streatham Apartment"}, {"id": 179, "guest": "Jo Khan", "property_id": 102, "arrival": "2026-07-20", "departure": "2026-07-23", "nights": 3, "price": 420.0, "channel": "Booking.com", "status": "confirmed", "days_until": 34, "property": "Tooting Studio"}, {"id": 180, "guest": "Robin Khan", "property_id": 104, "arrival": "2026-07-28", "departure": "2026-07-31", "nights": 3, "price": 285.0, "channel": "Booking.com", "status": "confirmed", "days_until": 42, "property": "Valnay Flat"}, {"id": 181, "guest": "Jo Brown", "property_id": 104, "arrival": "2026-08-04", "departure": "2026-08-09", "nights": 5, "price": 550.0, "channel": "Vrbo", "status": "new", "days_until": 49, "property": "Valnay Flat"}, {"id": 182, "guest": "Chris Brown", "property_id": 104, "arrival": "2026-08-05", "departure": "2026-08-08", "nights": 3, "price": 480.0, "channel": "Airbnb", "status": "confirmed", "days_until": 50, "property": "Valnay Flat"}, {"id": 183, "guest": "Sam Lee", "property_id": 101, "arrival": "2026-08-06", "departure": "2026-08-09", "nights": 3, "price": 285.0, "channel": "Booking.com", "status": "cancelled", "days_until": 51, "property": "Streatham Apartment"}, {"id": 184, "guest": "Pat Brown", "property_id": 104, "arrival": "2026-08-07", "departure": "2026-08-09", "nights": 2, "price": 320.0, "channel": "Airbnb", "status": "confirmed", "days_until": 52, "property": "Valnay Flat"}, {"id": 185, "guest": "Chris Brown", "property_id": 103, "arrival": "2026-08-11", "departure": "2026-08-15", "nights": 4, "price": 440.0, "channel": "Airbnb", "status": "cancelled", "days_until": 56, "property": "Gassiot House"}, {"id": 186, "guest": "Sam Lee", "property_id": 102, "arrival": "2026-08-15", "departure": "2026-08-16", "nights": 1, "price": 120.0, "channel": "Airbnb", "status": "confirmed", "days_until": 60, "property": "Tooting Studio"}, {"id": 187, "guest": "Alex Jones", "property_id": 101, "arrival": "2026-08-16", "departure": "2026-08-20", "nights": 4, "price": 440.0, "channel": "Airbnb", "status": "confirmed", "days_until": 61, "property": "Streatham Apartment"}, {"id": 188, "guest": "Sam Brown", "property_id": 101, "arrival": "2026-08-18", "departure": "2026-08-22", "nights": 4, "price": 380.0, "channel": "Airbnb", "status": "confirmed", "days_until": 63, "property": "Streatham Apartment"}, {"id": 189, "guest": "Chris Patel", "property_id": 103, "arrival": "2026-08-19", "departure": "2026-08-22", "nights": 3, "price": 285.0, "channel": "Airbnb", "status": "confirmed", "days_until": 64, "property": "Gassiot House"}, {"id": 190, "guest": "Pat Khan", "property_id": 101, "arrival": "2026-08-20", "departure": "2026-08-22", "nights": 2, "price": 190.0, "channel": "Airbnb", "status": "cancelled", "days_until": 65, "property": "Streatham Apartment"}, {"id": 191, "guest": "Robin Khan", "property_id": 103, "arrival": "2026-08-21", "departure": "2026-08-25", "nights": 4, "price": 440.0, "channel": "Airbnb", "status": "confirmed", "days_until": 66, "property": "Gassiot House"}, {"id": 192, "guest": "Robin Lee", "property_id": 101, "arrival": "2026-08-22", "departure": "2026-08-29", "nights": 7, "price": 770.0, "channel": "Booking.com", "status": "confirmed", "days_until": 67, "property": "Streatham Apartment"}, {"id": 193, "guest": "Pat Brown", "property_id": 102, "arrival": "2026-08-25", "departure": "2026-08-28", "nights": 3, "price": 285.0, "channel": "Airbnb", "status": "confirmed", "days_until": 70, "property": "Tooting Studio"}, {"id": 194, "guest": "Sam Jones", "property_id": 102, "arrival": "2026-08-30", "departure": "2026-09-01", "nights": 2, "price": 280.0, "channel": "Booking.com", "status": "new", "days_until": 75, "property": "Tooting Studio"}, {"id": 195, "guest": "Robin Jones", "property_id": 102, "arrival": "2026-09-01", "departure": "2026-09-03", "nights": 2, "price": 220.0, "channel": "Direct", "status": "confirmed", "days_until": 77, "property": "Tooting Studio"}, {"id": 196, "guest": "Robin Patel", "property_id": 101, "arrival": "2026-09-04", "departure": "2026-09-11", "nights": 7, "price": 665.0, "channel": "Airbnb", "status": "confirmed", "days_until": 80, "property": "Streatham Apartment"}, {"id": 197, "guest": "Chris Lee", "property_id": 101, "arrival": "2026-09-06", "departure": "2026-09-09", "nights": 3, "price": 420.0, "channel": "Booking.com", "status": "confirmed", "days_until": 82, "property": "Streatham Apartment"}, {"id": 198, "guest": "Jo Smith", "property_id": 104, "arrival": "2026-09-08", "departure": "2026-09-09", "nights": 1, "price": 110.0, "channel": "Booking.com", "status": "new", "days_until": 84, "property": "Valnay Flat"}, {"id": 199, "guest": "Robin Patel", "property_id": 104, "arrival": "2026-09-09", "departure": "2026-09-14", "nights": 5, "price": 425.0, "channel": "Airbnb", "status": "confirmed", "days_until": 85, "property": "Valnay Flat"}, {"id": 200, "guest": "Jo Smith", "property_id": 104, "arrival": "2026-09-10", "departure": "2026-09-12", "nights": 2, "price": 320.0, "channel": "Vrbo", "status": "new", "days_until": 86, "property": "Valnay Flat"}, {"id": 201, "guest": "Sam Brown", "property_id": 103, "arrival": "2026-09-15", "departure": "2026-09-17", "nights": 2, "price": 220.0, "channel": "Booking.com", "status": "new", "days_until": 91, "property": "Gassiot House"}, {"id": 202, "guest": "Alex Brown", "property_id": 101, "arrival": "2026-09-16", "departure": "2026-09-19", "nights": 3, "price": 285.0, "channel": "Booking.com", "status": "confirmed", "days_until": 92, "property": "Streatham Apartment"}, {"id": 203, "guest": "Chris Patel", "property_id": 104, "arrival": "2026-09-17", "departure": "2026-09-20", "nights": 3, "price": 420.0, "channel": "Booking.com", "status": "new", "days_until": 93, "property": "Valnay Flat"}, {"id": 204, "guest": "Pat Patel", "property_id": 103, "arrival": "2026-09-18", "departure": "2026-09-22", "nights": 4, "price": 380.0, "channel": "Booking.com", "status": "confirmed", "days_until": 94, "property": "Gassiot House"}, {"id": 205, "guest": "Chris Patel", "property_id": 102, "arrival": "2026-09-19", "departure": "2026-09-24", "nights": 5, "price": 700.0, "channel": "Airbnb", "status": "request", "days_until": 95, "property": "Tooting Studio"}], "counts": {"properties": 4, "rooms": 4, "bookings": 217}};
+const CUR = DATA.currency || "";
+const money = v => CUR + (v==null?0:v).toLocaleString(undefined,{maximumFractionDigits:0});
+const pct = v => (v*100).toFixed(1) + "%";
+
+document.getElementById("lastFetch").textContent = DATA.last_fetch || "—";
+document.getElementById("builtAt").textContent = DATA.generated_at || "—";
+document.getElementById("propCount").textContent =
+  DATA.counts.properties + " properties · " + DATA.counts.bookings + " bookings";
+
+// tabs
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById("view-"+t.dataset.view).classList.add("active");
+});
+
+function card(label,value,sub){
+  return `<div class="card"><div class="label">${label}</div>
+          <div class="value">${value}</div><div class="sub">${sub||""}</div></div>`;
+}
+
+// ---- Occupancy ----
+const tm = DATA.kpi_this_month, n30 = DATA.kpi_next_30, n90 = DATA.kpi_next_90;
+document.getElementById("occCards").innerHTML =
+  card("Occupancy (this month)", pct(tm.occupancy), `${tm.sold_room_nights}/${tm.available_room_nights} room-nights`)
++ card("Occupancy (next 30d)", pct(n30.occupancy), `${n30.sold_room_nights} nights sold`)
++ card("Occupancy (next 90d)", pct(n90.occupancy), `${n90.sold_room_nights} nights sold`)
++ card("Room capacity", DATA.room_capacity, "sellable units");
+
+new Chart(document.getElementById("occChart"),{
+  type:"bar",
+  data:{labels:DATA.monthly.map(m=>m.label),
+    datasets:[{label:"Occupancy %",data:DATA.monthly.map(m=>+(m.occupancy*100).toFixed(1)),
+      backgroundColor:DATA.monthly.map(m=> m.month>=new Date().toISOString().slice(0,7)+"-01" ? "#4f9cf9":"#3a5573")}]},
+  options:{plugins:{legend:{display:false}},scales:{y:{ticks:{color:"#8b98a5",callback:v=>v+"%"},grid:{color:"#2c3744"},max:100},
+    x:{ticks:{color:"#8b98a5"},grid:{display:false}}}}
+});
+
+// ---- Revenue ----
+document.getElementById("revCards").innerHTML =
+  card("Revenue (this month)", money(tm.revenue), "active bookings")
++ card("ADR (this month)", money(tm.adr), "avg daily rate")
++ card("RevPAR (this month)", money(tm.revpar), "rev / available night")
++ card("Revenue (next 90d)", money(n90.revenue), "on the books");
+
+new Chart(document.getElementById("revChart"),{
+  data:{labels:DATA.monthly.map(m=>m.label),
+    datasets:[
+      {type:"bar",label:"Revenue",data:DATA.monthly.map(m=>m.revenue),backgroundColor:"#3a5573",yAxisID:"y"},
+      {type:"line",label:"RevPAR",data:DATA.monthly.map(m=>m.revpar),borderColor:"#4f9cf9",backgroundColor:"#4f9cf9",yAxisID:"y1",tension:.3}
+    ]},
+  options:{plugins:{legend:{labels:{color:"#8b98a5"}}},
+    scales:{y:{position:"left",ticks:{color:"#8b98a5"},grid:{color:"#2c3744"}},
+      y1:{position:"right",ticks:{color:"#8b98a5"},grid:{display:false}},
+      x:{ticks:{color:"#8b98a5"},grid:{display:false}}}}
+});
+
+const chan = DATA.channel_mix;
+const chanTotal = chan.reduce((s,c)=>s+c.revenue,0)||1;
+new Chart(document.getElementById("chanChart"),{
+  type:"doughnut",
+  data:{labels:chan.map(c=>c.channel),
+    datasets:[{data:chan.map(c=>c.revenue),
+      backgroundColor:["#4f9cf9","#3fb950","#d29922","#f85149","#a371f7","#39c5cf","#db61a2","#6e7681"]}]},
+  options:{plugins:{legend:{position:"right",labels:{color:"#8b98a5",boxWidth:12}}}}
+});
+document.querySelector("#chanTable tbody").innerHTML = chan.map(c=>
+  `<tr><td>${c.channel}</td><td class="num">${c.bookings}</td><td class="num">${c.nights}</td>
+   <td class="num">${money(c.revenue)}</td><td class="num">${(c.revenue/chanTotal*100).toFixed(1)}%</td></tr>`).join("")
+  || `<tr><td colspan="5" class="muted">No channel data yet</td></tr>`;
+
+// ---- Feed ----
+document.querySelector("#feedTable tbody").innerHTML = DATA.feed.map(b=>{
+  const st=(b.status||"").toLowerCase();
+  const when = b.days_until===0?"today":(b.days_until>0?`in ${b.days_until}d`:`${-b.days_until}d ago`);
+  return `<tr><td>${b.arrival||"—"}<div class="muted" style="font-size:11px">${when}</div></td>
+    <td>${b.guest}</td><td>${b.property??"—"}</td><td>${b.nights??"—"}</td>
+    <td><span class="chip">${b.channel}</span></td><td class="num">${money(b.price)}</td>
+    <td><span class="pill ${st}">${b.status||"—"}</span></td></tr>`;
+}).join("") || `<tr><td colspan="7" class="muted">No bookings in range</td></tr>`;
+
+// ---- Pace ----
+const p=DATA.pace, ty=p.this_year, ly=p.last_year;
+const deltaCls = (p.revenue_delta>=0)?"pos":"neg";
+const deltaSign = (p.revenue_delta>=0)?"+":"";
+document.getElementById("paceCards").innerHTML =
+  card("Revenue next 90d", money(ty.revenue), "on the books now")
++ card("Same window last yr", money(ly.revenue), "for comparison")
++ card("Pace vs last year", `<span class="${deltaCls}">${deltaSign}${money(p.revenue_delta)}</span>`,
+       p.revenue_delta_pct==null?"":`${deltaSign}${p.revenue_delta_pct}%`)
++ card("Bookings next 90d", ty.bookings, `vs ${ly.bookings} last year`);
+
+new Chart(document.getElementById("paceChart"),{
+  type:"bar",
+  data:{labels:["Revenue","Nights sold","Bookings"],
+    datasets:[
+      {label:"This year",data:[ty.revenue,ty.sold_room_nights,ty.bookings],backgroundColor:"#4f9cf9"},
+      {label:"Last year",data:[ly.revenue,ly.sold_room_nights,ly.bookings],backgroundColor:"#6e7681"}
+    ]},
+  options:{plugins:{legend:{labels:{color:"#8b98a5"}}},
+    scales:{y:{ticks:{color:"#8b98a5"},grid:{color:"#2c3744"}},x:{ticks:{color:"#8b98a5"},grid:{display:false}}}}
+});
+
+const lt=DATA.lead_time;
+new Chart(document.getElementById("leadChart"),{
+  type:"bar",
+  data:{labels:Object.keys(lt),datasets:[{label:"Bookings",data:Object.values(lt),
+    backgroundColor:"#3fb950"}]},
+  options:{plugins:{legend:{display:false}},
+    scales:{y:{ticks:{color:"#8b98a5"},grid:{color:"#2c3744"}},x:{ticks:{color:"#8b98a5"},grid:{display:false}}}}
+});
+</script>
+</body>
+</html>

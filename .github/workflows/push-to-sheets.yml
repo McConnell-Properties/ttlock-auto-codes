@@ -1,0 +1,31 @@
+name: push-to-sheets
+
+on:
+  schedule:
+    # 8am UTC daily
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  push:
+    name: Push reservations to Google Sheets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install gspread google-auth requests python-dotenv
+
+      - name: Run push_to_sheets.py
+        env:
+          CHANNEL_MANAGER_URL: ${{ vars.VERCEL_URL }}
+          CM_API_KEY: ${{ secrets.CM_API_KEY }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python3 scripts/push_to_sheets.py

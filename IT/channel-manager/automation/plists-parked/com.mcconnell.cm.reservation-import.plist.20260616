@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.mcconnell.cm.reservation-import</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/run-job.sh</string>
+    <string>reservation-import</string>
+    <string>/bin/bash</string>
+    <string>/Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/jobs/reservation-import.sh</string>
+  </array>
+  <key>WatchPaths</key><array><string>/Users/charliemcconnell/Documents/Career/McConnell Enterprises/IT/ttlock-auto-codes/automation-data/reservation_status.csv</string></array><key>ThrottleInterval</key><integer>15</integer><key>StartCalendarInterval</key><dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>40</integer></dict>
+  <key>StandardOutPath</key><string>/Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/logs/reservation-import.launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/charliemcconnell/ttlock-auto-codes/IT/channel-manager/automation/logs/reservation-import.launchd.log</string>
+</dict>
+</plist>

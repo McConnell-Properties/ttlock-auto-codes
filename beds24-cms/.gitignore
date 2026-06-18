@@ -1,0 +1,12 @@
+# Secrets — NEVER commit
+secrets.json
+
+# Local data & artifacts
+data/*.db
+raw/*.json
+logs/*.log
+dashboard.html
+
+# Python
+__pycache__/
+*.pyc
