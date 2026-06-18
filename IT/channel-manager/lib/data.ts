@@ -43,6 +43,9 @@ export type Booking = {
   stripeStatus: string | null; // link_sent | paid | expired
   paidAt: string | null;
   createdAt: string;
+  originPropertyId: string | null;
+  originRoomTypeId: number | null;
+  originPhysicalRoom: string | null;
 };
 
 export type SyncJob = {
@@ -250,9 +253,21 @@ export async function moveBooking(bookingId: number, target: MoveTarget, force =
     newRoomTypeId = crossProperty ? null : b.roomTypeId;
   }
 
+  // Capture origin on first move only — never overwrite once set.
   await run(
-    `UPDATE Booking SET propertyId = ?, physicalRoom = ?, roomTypeId = ?, checkIn = ?, checkOut = ? WHERE id = ?`,
-    [newPropertyId, target.physicalRoom, newRoomTypeId, newCheckIn, newCheckOut, bookingId]
+    `UPDATE Booking SET
+       propertyId         = ?,
+       physicalRoom       = ?,
+       roomTypeId         = ?,
+       checkIn            = ?,
+       checkOut           = ?,
+       originPropertyId   = CASE WHEN originPropertyId IS NULL THEN ? ELSE originPropertyId END,
+       originRoomTypeId   = CASE WHEN originPropertyId IS NULL THEN ? ELSE originRoomTypeId END,
+       originPhysicalRoom = CASE WHEN originPropertyId IS NULL THEN ? ELSE originPhysicalRoom END
+     WHERE id = ?`,
+    [newPropertyId, target.physicalRoom ?? null, newRoomTypeId, newCheckIn, newCheckOut,
+     b.propertyId, b.roomTypeId, b.physicalRoom,
+     bookingId]
   );
   return {
     ok: true,
@@ -829,6 +844,52 @@ export function crmRows(aheadDays = 7, backDays = 30) {
        AND b.checkOut >= date('now', '-' || ? || ' days')
      ORDER BY b.checkIn`,
     [aheadDays, backDays]
+  );
+}
+
+// ---------- extras availability ----------
+
+export type ExtrasOccupancyRow = {
+  id: number;
+  bookingId: number;
+  extra: string;
+  checkIn: string;
+  checkOut: string;
+  guestName: string;
+  physicalRoom: string | null;
+  channelRef: string | null;
+  channel: string;
+};
+
+/** Count of PAID extras of a given type whose booking covers `date`. */
+export async function extraAvailable(extraId: string, date: string): Promise<number> {
+  const cap = await one<{ capacity: number }>(
+    `SELECT capacity FROM ExtraCapacity WHERE extraId = ?`, [extraId]
+  );
+  if (!cap) return 0;
+  const row = await one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM ExtrasRequest e
+     JOIN Booking b ON b.id = e.bookingId
+     WHERE e.extra = ? AND e.sourceStatus = 'paid'
+       AND b.status = 'confirmed'
+       AND b.checkIn <= ? AND b.checkOut > ?`,
+    [extraId, date, date]
+  );
+  return Math.max(0, cap.capacity - (row?.n ?? 0));
+}
+
+/** All PAID extras whose linked booking overlaps [start, end) — for the extras calendar. */
+export function extrasWindowOccupancy(start: string, end: string) {
+  return all<ExtrasOccupancyRow>(
+    `SELECT e.id, e.bookingId, e.extra,
+            b.checkIn, b.checkOut, b.guestName, b.physicalRoom, b.channelRef, b.channel
+     FROM ExtrasRequest e
+     JOIN Booking b ON b.id = e.bookingId
+     WHERE e.sourceStatus = 'paid'
+       AND b.status = 'confirmed'
+       AND b.checkIn < ? AND b.checkOut > ?
+     ORDER BY b.checkIn`,
+    [end, start]
   );
 }
 

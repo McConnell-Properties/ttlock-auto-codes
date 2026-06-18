@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { moveBookingAction, updateBookingAction, quoteAction, cancelBooking, createBooking, sendPaymentLinkAction, syncStripeAction, setPrice } from '@/lib/actions';
+import { assignLanes, dayLabel, channelClass, shortName, addDays, daysDiff } from '@/lib/cal-utils';
 
 type B = {
   id: number;
@@ -23,6 +24,9 @@ type B = {
   notes: string | null;
   stripeStatus: string | null;
   stripePaymentUrl: string | null;
+  originPropertyId: string | null;
+  originRoomTypeId: number | null;
+  originPhysicalRoom: string | null;
 };
 
 type Group = {
@@ -58,53 +62,6 @@ type Props = {
   bookings: B[];
 };
 
-/** Greedy interval stacking: assigns bookings to the minimum number of lanes
- *  so no two bookings in the same lane overlap (checkIn >= last.checkOut). */
-function assignLanes(bookings: B[]): B[][] {
-  const sorted = [...bookings].sort((a, b) => (a.checkIn < b.checkIn ? -1 : 1));
-  const lanes: B[][] = [];
-  for (const bk of sorted) {
-    let placed = false;
-    for (const lane of lanes) {
-      if (bk.checkIn >= lane[lane.length - 1].checkOut) {
-        lane.push(bk);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) lanes.push([bk]);
-  }
-  return lanes;
-}
-
-function dayLabel(date: string) {
-  const d = new Date(date + 'T00:00:00Z');
-  const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
-  return { wd, dm: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`, weekend: d.getUTCDay() === 0 || d.getUTCDay() === 6 };
-}
-
-function channelClass(channel: string) {
-  if (channel === 'booking.com') return 'bar-bdc';
-  if (channel === 'expedia') return 'bar-expedia';
-  if (channel === 'airbnb') return 'bar-airbnb';
-  if (channel === 'direct') return 'bar-direct';
-  return 'bar-other';
-}
-
-function shortName(name: string) {
-  const n = (name || '').replace(/^Imported.*$/, 'Imported').trim();
-  return n.length > 18 ? n.slice(0, 17) + '…' : n || 'Guest';
-}
-
-function addDays(date: string, n: number) {
-  const d = new Date(date + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-function daysDiff(a: string, b: string) {
-  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
-}
 
 export default function MultiCal({ groups, dates: initDates, rates: initRates, bookings: initBookings }: Props) {
   const router = useRouter();
@@ -345,6 +302,7 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
               className={isStart ? 'mc-name' : 'mc-cont'}
             >
               {isStart ? shortName(b.guestName) : ' '}
+              {isStart && b.originPhysicalRoom ? <span className="mc-moved" title={`Moved from room ${b.originPhysicalRoom}`}>↗</span> : null}
             </span>
           )}
         </td>
@@ -497,6 +455,13 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
                 </button>
               )}
             </div>
+
+            {sel.originPhysicalRoom && (
+              <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff8e1', borderRadius: 6, fontSize: 12.5 }}>
+                <span className="badge" style={{ background: '#f59e0b', color: '#fff', marginRight: 6 }}>moved</span>
+                Origin: {groups.find((g) => g.id === sel.originPropertyId)?.name ?? sel.originPropertyId} · Room {sel.originPhysicalRoom}
+              </div>
+            )}
 
             <div className="row">
               <button disabled={pending || !edit.ci || !edit.co || edit.co <= edit.ci} onClick={saveEdit}>

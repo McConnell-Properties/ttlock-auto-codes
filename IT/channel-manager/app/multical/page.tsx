@@ -85,6 +85,9 @@ export default async function MultiCalPage({
           notes: b.notes,
           stripeStatus: b.stripeStatus,
           stripePaymentUrl: b.stripePaymentUrl,
+          originPropertyId: b.originPropertyId ?? null,
+          originRoomTypeId: b.originRoomTypeId ?? null,
+          originPhysicalRoom: b.originPhysicalRoom ?? null,
         }))}
       />
     </>
