@@ -165,7 +165,13 @@ label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px
 .mc-lane-label { color: var(--muted) !important; font-size: 10px !important; font-weight: 400 !important; }
 .mc-type .mc-rate {
   font-size: 10.5px; color: var(--muted); font-weight: 500;
-  text-align: center; padding: 4px 2px; background: #eef1f6;
+  text-align: center; padding: 4px 2px; background: #eef1f6; cursor: default;
+}
+.mc-type .mc-rate:hover { outline: 1px dashed var(--border); outline-offset: -1px; }
+.mc-rate-input {
+  width: 100%; box-sizing: border-box; font-size: 10.5px; font-weight: 600;
+  text-align: center; border: 2px solid var(--accent); border-radius: 3px;
+  background: #fff; color: var(--text); padding: 1px 2px; outline: none;
 }
 .mc-sel {
   background: var(--accent-soft) !important;

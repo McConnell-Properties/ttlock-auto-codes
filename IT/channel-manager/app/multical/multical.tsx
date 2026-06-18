@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { moveBookingAction, updateBookingAction, quoteAction, cancelBooking, createBooking, sendPaymentLinkAction, syncStripeAction } from '@/lib/actions';
+import { moveBookingAction, updateBookingAction, quoteAction, cancelBooking, createBooking, sendPaymentLinkAction, syncStripeAction, setPrice } from '@/lib/actions';
 
 type B = {
   id: number;
@@ -263,6 +263,17 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
     });
   };
 
+  const handleSetPrice = (roomTypeId: number, date: string, price: number) => {
+    setRates((prev) => ({
+      ...prev,
+      [roomTypeId]: { ...(prev[roomTypeId] || {}), [date]: price },
+    }));
+    startTransition(async () => {
+      await setPrice(roomTypeId, date, price);
+      router.refresh();
+    });
+  };
+
   const rowKey = (t: RowTarget) => `${t.propertyId}|${t.physicalRoom ?? ''}|${t.roomTypeId ?? ''}`;
 
   const finishSelect = () => {
@@ -367,6 +378,7 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
                 dates={dates}
                 rates={rates}
                 renderCells={renderCells}
+                onSetPrice={handleSetPrice}
               />
             );
           })}
@@ -709,6 +721,7 @@ function PropertyRows({
   dates,
   rates,
   renderCells,
+  onSetPrice,
 }: {
   group: Group;
   propBookings: B[];
@@ -716,6 +729,7 @@ function PropertyRows({
   dates: string[];
   rates: Record<number, Record<string, number>>;
   renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean, conflictOcc?: (date: string) => B[]) => React.ReactNode;
+  onSetPrice: (roomTypeId: number, date: string, price: number) => void;
 }) {
   return (
     <>
@@ -726,7 +740,7 @@ function PropertyRows({
         const typeBookings = propBookings.filter((b) => b.roomTypeId === t.id);
         const unassigned = typeBookings.filter((b) => !b.physicalRoom);
         return (
-          <TypeRows key={t.id} g={g} t={t} typeBookings={typeBookings} unassigned={unassigned} dates={dates} rates={rates} renderCells={renderCells} />
+          <TypeRows key={t.id} g={g} t={t} typeBookings={typeBookings} unassigned={unassigned} dates={dates} rates={rates} renderCells={renderCells} onSetPrice={onSetPrice} />
         );
       })}
       {(untyped.length > 0) && (
@@ -751,6 +765,7 @@ function TypeRows({
   dates,
   rates,
   renderCells,
+  onSetPrice,
 }: {
   g: Group;
   t: { id: number; name: string; basePrice: number; rooms: string[] };
@@ -759,14 +774,60 @@ function TypeRows({
   dates: string[];
   rates: Record<number, Record<string, number>>;
   renderCells: (occ: (date: string) => B[], rowTarget: RowTarget, allowOverlapWarn: boolean, conflictOcc?: (date: string) => B[]) => React.ReactNode;
+  onSetPrice: (roomTypeId: number, date: string, price: number) => void;
 }) {
+  const [editing, setEditing] = useState<{ date: string; value: string } | null>(null);
+  const commitFiredRef = useRef(false);
+
+  const commit = (snap: { date: string; value: string }) => {
+    if (commitFiredRef.current) return;
+    commitFiredRef.current = true;
+    setEditing(null);
+    const raw = parseFloat(snap.value);
+    if (isNaN(raw) || raw < 0) return;
+    if (raw < 10 && !confirm(`£${raw} is unusually low. Push this price live to Booking.com?`)) return;
+    if (raw > 2000 && !confirm(`£${raw} is unusually high. Push this price live to Booking.com?`)) return;
+    onSetPrice(t.id, snap.date, raw);
+  };
+
   return (
     <>
       <tr className="mc-type">
         <td>{t.name}</td>
-        {dates.map((d) => (
-          <td key={d} className="mc-rate">£{rates[t.id]?.[d] ?? t.basePrice}</td>
-        ))}
+        {dates.map((d) => {
+          const current = rates[t.id]?.[d] ?? t.basePrice;
+          const isEditing = editing?.date === d;
+          return (
+            <td
+              key={d}
+              className="mc-rate"
+              onDoubleClick={() => {
+                commitFiredRef.current = false;
+                setEditing({ date: d, value: String(current) });
+              }}
+              title="Double-click to edit rate"
+            >
+              {isEditing ? (
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  autoFocus
+                  value={editing!.value}
+                  onChange={(e) => setEditing({ date: d, value: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setEditing(null); commitFiredRef.current = true; }
+                    if (e.key === 'Enter') { e.preventDefault(); commit(editing!); }
+                  }}
+                  onBlur={() => commit(editing!)}
+                  className="mc-rate-input"
+                />
+              ) : (
+                `£${current}`
+              )}
+            </td>
+          );
+        })}
       </tr>
       {t.rooms.flatMap((room) => {
         const roomBookings = typeBookings.filter((b) => b.physicalRoom === room);
