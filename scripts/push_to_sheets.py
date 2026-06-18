@@ -51,7 +51,6 @@ HEADER_MAP = {
     'Room types':               'roomTypeName',
     'Rooms':                    'physicalRoom',
     'Notes':                    'notes',
-    'Guest comments':           'notes',
     'Number of Rooms':          'units',
     'Number of adults':         'adults',
     'Number of children':       'children',
@@ -116,21 +115,8 @@ def resolve_value(row: dict, field: str) -> str:
 
 
 def push(reservations, sheet):
-    # Read existing headers
+    # Read existing headers — only write to columns already in the sheet
     header_row = sheet.row_values(1)
-
-    # Identify which new CMS headers aren't in the Sheet yet
-    new_headers = [h for h in HEADER_MAP if h not in header_row and h not in (
-        '_guestFirstName', '_guestLastName'  # synthetic — never become Sheet headers
-    )]
-
-    # Append new headers at the end
-    if new_headers:
-        start_col = len(header_row) + 1
-        for i, h in enumerate(new_headers):
-            sheet.update_cell(1, start_col + i, h)
-        header_row = sheet.row_values(1)  # re-fetch
-        print(f'  Added {len(new_headers)} new header(s): {new_headers}')
 
     # Build col-index map (1-based → 0-based for list indexing)
     col_idx = {h: i for i, h in enumerate(header_row)}
