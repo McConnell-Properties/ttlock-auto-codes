@@ -847,6 +847,52 @@ export function crmRows(aheadDays = 7, backDays = 30) {
   );
 }
 
+// ---------- extras availability ----------
+
+export type ExtrasOccupancyRow = {
+  id: number;
+  bookingId: number;
+  extra: string;
+  checkIn: string;
+  checkOut: string;
+  guestName: string;
+  physicalRoom: string | null;
+  channelRef: string | null;
+  channel: string;
+};
+
+/** Count of PAID extras of a given type whose booking covers `date`. */
+export async function extraAvailable(extraId: string, date: string): Promise<number> {
+  const cap = await one<{ capacity: number }>(
+    `SELECT capacity FROM ExtraCapacity WHERE extraId = ?`, [extraId]
+  );
+  if (!cap) return 0;
+  const row = await one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM ExtrasRequest e
+     JOIN Booking b ON b.id = e.bookingId
+     WHERE e.extra = ? AND e.sourceStatus = 'paid'
+       AND b.status = 'confirmed'
+       AND b.checkIn <= ? AND b.checkOut > ?`,
+    [extraId, date, date]
+  );
+  return Math.max(0, cap.capacity - (row?.n ?? 0));
+}
+
+/** All PAID extras whose linked booking overlaps [start, end) — for the extras calendar. */
+export function extrasWindowOccupancy(start: string, end: string) {
+  return all<ExtrasOccupancyRow>(
+    `SELECT e.id, e.bookingId, e.extra,
+            b.checkIn, b.checkOut, b.guestName, b.physicalRoom, b.channelRef, b.channel
+     FROM ExtrasRequest e
+     JOIN Booking b ON b.id = e.bookingId
+     WHERE e.sourceStatus = 'paid'
+       AND b.status = 'confirmed'
+       AND b.checkIn < ? AND b.checkOut > ?
+     ORDER BY b.checkIn`,
+    [end, start]
+  );
+}
+
 // ---------- sync queue ----------
 
 export type SyncJobWithRoom = SyncJob & {

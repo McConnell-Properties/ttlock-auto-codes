@@ -56,6 +56,28 @@ DATABASE_AUTH_TOKEN=<token> \
 node db/migrate-booking-origin.mjs --live
 ```
 
+## 2026-06-18 · NEEDS-PM · migrate-extras-capacity (prod schema write)
+`db/migrate-extras-capacity.mjs` creates the `ExtraCapacity` table and seeds 3 rows:
+- parking = 1, vented-ac = 2, cooking-pack = 5
+
+Idempotent (skips CREATE if table exists; INSERT OR IGNORE for seeds).
+**Awaiting Charlie sign-off before running `--live` on prod.**
+Command (once approved):
+```
+DATABASE_URL=libsql://mcconnell-cm-mcconnell-properties.aws-eu-west-1.turso.io \
+DATABASE_AUTH_TOKEN=<token> \
+node db/migrate-extras-capacity.mjs --live
+```
+
+## 2026-06-18 · P3-CONTRACT · GET /api/extras/availability
+Portal uses this at payment step to gate extras purchase.
+```
+GET /api/extras/availability?extra=parking&from=2026-07-01&to=2026-07-05
+→ { extra, from, to, capacity, days: [{ date, available }] }
+```
+`available=0` on any day = extra fully booked for that night. Unpaid quotes excluded.
+P3 must call this for the full stay span before charging. Flag to direct-booking-web track.
+
 ## 2026-06-18 · REPORT · moved-booking origin display
 Shipped on `cms-dev`: when a booking has been moved, its origin is now visible.
 
