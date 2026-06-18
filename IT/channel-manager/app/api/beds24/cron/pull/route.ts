@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { checkCronAuth } from '@/lib/cron-auth';
 import { beds24 } from '@/lib/beds24';
 import { db, all, run } from '@/lib/db';
+import { queueInventorySync, nightsBetween } from '@/lib/data';
 
 const PAGE_SIZE = 100;
 const NATIVE_CHANNELS = new Set(['booking.com', 'airbnb', 'expedia']);
@@ -189,6 +190,10 @@ export async function POST(req: Request) {
         );
         created++;
         console.log(`[cron/pull] CREATED hub booking beds24Id=${beds24IdStr} channelRef=${channelRef}`);
+        // Queue inventory push for all dates of this booking so BDC gets updated counts
+        if (rtId && b.arrival && b.departure) {
+          await queueInventorySync(rtId, nightsBetween(b.arrival, b.departure));
+        }
       }
 
       console.log(`[cron/pull] page processed: ${bookings.length} bookings (total: ${totalFetched})`);
