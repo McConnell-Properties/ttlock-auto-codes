@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   const time =
     String(form.get('time') ?? form.get('earlyTime') ?? form.get('lateTime') ?? '').trim() || null;
   const nights = form.get('nights') ? Math.min(30, Math.max(1, Number(form.get('nights')) || 1)) : null;
+  const guestType = String(form.get('guestType') ?? '').trim() || undefined;
 
   // 11am same-day cutoff for service extras
   if (SAME_DAY_CUTOFF_IDS.has(extra.id) && date) {
@@ -59,12 +60,19 @@ export async function POST(req: NextRequest) {
   // ---- price ----
   let price: number;
   if (extra.calendar) {
-    // aircon / parking: date + nights against live availability & dynamic pricing
     if (!date || !nights) return NextResponse.redirect(`${SITE}/portal?error=3`, 303);
-    if (!rangeAvailable(extra.id as 'aircon' | 'parking', date, nights)) {
+    if (!await rangeAvailable(extra.id, date, nights)) {
       return NextResponse.redirect(`${SITE}/portal?error=soldout&extra=${extra.id}`, 303);
     }
-    price = await calendarExtraTotal(extra.id as 'aircon' | 'parking', date, nights, prop.id);
+    if (extra.id === 'aircon' || extra.id === 'parking') {
+      price = await calendarExtraTotal(extra.id, date, nights, prop.id);
+    } else if (extra.id === 'cooking-pack') {
+      price = 15; // flat pack hire fee, no per-night cost
+    } else {
+      // extra-guest-double / extra-guest-single
+      const rate = guestType === 'child' ? 2.5 : 5;
+      price = Math.round((rate * nights + 10) * 100) / 100;
+    }
   } else if (extra.id === 'early-checkin') {
     // Deadline-aware pricing: £10→£15 for 1pm, £5→£10 for 2pm after 20:00 UK the day before check-in.
     const bk = await findBookingByRef(ref);
@@ -77,16 +85,18 @@ export async function POST(req: NextRequest) {
     const is1pm = time === '13:00';
     price = is1pm ? (postDeadline ? 15 : 10) : (postDeadline ? 10 : 5);
   } else {
-    price = priceForExtra(extra.id, { nights: nights ?? undefined, lateTime: time ?? undefined });
+    price = priceForExtra(extra.id, { nights: nights ?? undefined, lateTime: time ?? undefined, guestType });
     if (price < 0) return NextResponse.redirect(`${SITE}/portal?error=3`, 303);
   }
 
   const stripeKey = stripeKeyFor(prop.id);
 
   // Free extras, or no Stripe configured → auto-confirmed immediately.
+  const extraLabel = guestType ? `${extra.name} (${guestType})` : extra.name;
+
   if (price === 0 || !stripeKey) {
-    addRequest({
-      ref, guestName, extraId: extra.id, extraName: extra.name,
+    await addRequest({
+      ref, guestName, extraId: extra.id, extraName: extraLabel,
       date, time, nights, price,
       status: 'confirmed', stripeSession: null,
     });
@@ -110,12 +120,12 @@ export async function POST(req: NextRequest) {
         },
       },
     }],
-    metadata: { reservation_code: ref, extra: extra.id, date: date || '', time: time || '', nights: String(nights || '') },
+    metadata: { reservation_code: ref, extra: extra.id, date: date || '', time: time || '', nights: String(nights || ''), guestType: guestType || '' },
     success_url: `${SITE}/portal/extra-paid?session_id={CHECKOUT_SESSION_ID}${safeReturn ? `&returnTo=${encodeURIComponent(safeReturn)}` : ''}`,
     cancel_url: safeReturn ? `${SITE}${safeReturn}` : `${SITE}/portal`,
   });
-  addRequest({
-    ref, guestName, extraId: extra.id, extraName: extra.name,
+  await addRequest({
+    ref, guestName, extraId: extra.id, extraName: extraLabel,
     date, time, nights, price,
     status: 'pending-payment', stripeSession: session.id,
   });

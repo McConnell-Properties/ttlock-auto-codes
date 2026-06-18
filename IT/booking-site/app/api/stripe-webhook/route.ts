@@ -30,7 +30,9 @@ const CM_DB = path.resolve(process.cwd(), process.env.CM_DB_PATH || '../channel-
 
 async function markChannelManagerPaid(sessionId: string): Promise<boolean> {
   try {
-    const db = createClient({ url: `file:${CM_DB}` });
+    const db = process.env.DATABASE_URL
+      ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+      : createClient({ url: `file:${CM_DB}` });
     const r = await db.execute({
       sql: `UPDATE Booking SET stripeStatus = 'paid', paidAt = ?
             WHERE stripeSessionId = ? AND stripeStatus = 'link_sent'`,
@@ -75,7 +77,9 @@ export async function POST(req: NextRequest) {
   if (event.type === 'checkout.session.expired') {
     const s = event.data.object as import('stripe').Stripe.Checkout.Session;
     try {
-      const db = createClient({ url: `file:${CM_DB}` });
+      const db = process.env.DATABASE_URL
+        ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+        : createClient({ url: `file:${CM_DB}` });
       await db.execute({
         sql: `UPDATE Booking SET stripeStatus = 'expired' WHERE stripeSessionId = ? AND stripeStatus = 'link_sent'`,
         args: [s.id],
@@ -95,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   // 1. portal extras payment
   if (m.extra) {
-    const req2 = markRequestPaid(session.id);
+    const req2 = await markRequestPaid(session.id);
     console.log(`stripe-webhook: extra ${m.extra} for ${m.reservation_code} → ${req2 ? 'paid' : 'request not found'}`);
     return NextResponse.json({ received: true, handled: 'extra' });
   }
@@ -104,7 +108,7 @@ export async function POST(req: NextRequest) {
   // extras + card save). Mark all matching requests paid, save the card flag, push
   // to CMS so staff see the paid line items immediately.
   if (m.type === 'checkin_extras') {
-    const paid = markAllRequestsPaid(session.id);
+    const paid = await markAllRequestsPaid(session.id);
     markCardSaved(m.reservation_code);
     console.log(`stripe-webhook: checkin extras for ${m.reservation_code} → ${paid.length} paid`);
     void postCheckinUpsert({

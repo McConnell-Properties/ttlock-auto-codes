@@ -3,7 +3,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { createClient } from '@libsql/client';
 
 const CHECKIN_DATA =
@@ -15,6 +14,13 @@ const RES_STATUS =
 const CM_DB = path.resolve(process.cwd(), process.env.CM_DB_PATH || '../channel-manager/db/dev.db');
 const SECRET = process.env.PORTAL_SECRET || 'change-me-portal-secret';
 const REQUESTS = path.join(process.cwd(), '.data', 'extras-requests.json');
+const REQUESTS_CSV = path.join(process.cwd(), '.data', 'extras-requests.csv');
+
+function tursoDb() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  return createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN || '' });
+}
 
 export type GuestBooking = {
   ref: string;
@@ -110,10 +116,16 @@ function fromReservationStatus(ref: string): Partial<GuestBooking> | null {
 
 async function fromChannelManager(ref: string): Promise<Partial<GuestBooking> | null> {
   try {
-    const db = createClient({ url: `file:${CM_DB}` });
+    const db = process.env.DATABASE_URL
+      ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+      : createClient({ url: `file:${CM_DB}` });
     const rs = await db.execute({
-      sql: `SELECT guestName, checkIn, checkOut, physicalRoom, channelRef FROM Booking
-            WHERE status = 'confirmed' AND channelRef = ? COLLATE NOCASE ORDER BY checkIn LIMIT 1`,
+      sql: `SELECT b.guestName, b.checkIn, b.checkOut, b.physicalRoom, b.channelRef,
+                   b.stripePaymentUrl, b.stripeStatus, b.lockCode, c.arrivalTime
+            FROM Booking b
+            LEFT JOIN CrmRecord c ON c.bookingId = b.id
+            WHERE b.status = 'confirmed' AND b.channelRef = ? COLLATE NOCASE
+            ORDER BY b.checkIn LIMIT 1`,
       args: [ref.trim()],
     });
     if (!rs.rows.length) return null;
@@ -124,8 +136,10 @@ async function fromChannelManager(ref: string): Promise<Partial<GuestBooking> | 
       checkIn: r.checkIn,
       checkOut: r.checkOut,
       room: r.physicalRoom ? `Room ${r.physicalRoom}` : null,
-      arrivalTime: null,
-      lockCode: null,
+      arrivalTime: r.arrivalTime || null,
+      lockCode: r.lockCode || null,
+      stripeLink: r.stripePaymentUrl || null,
+      stripeStatus: r.stripeStatus || null,
     };
   } catch {
     return null;
@@ -208,9 +222,11 @@ export async function findGuestBookingByDetails(
     }
   } catch { /* next source */ }
 
-  // 3. channel-manager DB (direct bookings)
+  // 3. channel-manager DB (covers direct bookings and Turso-synced OTA bookings)
   try {
-    const db = createClient({ url: `file:${CM_DB}` });
+    const db = process.env.DATABASE_URL
+      ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+      : createClient({ url: `file:${CM_DB}` });
     const rs = await db.execute({
       sql: `SELECT guestName, channelRef FROM Booking
             WHERE status = 'confirmed' AND checkIn = ? AND checkOut = ? AND channelRef IS NOT NULL`,
@@ -266,9 +282,7 @@ export type ExtraRequest = {
   createdAt: string;
 };
 
-// CSV mirror of the requests ledger — easy pickup for the CRM / channel-manager
-// agent (one row per request, appended on every change).
-const REQUESTS_CSV = path.join(process.cwd(), '.data', 'extras-requests.csv');
+// ---------- flat-file fallback (local dev only, no DATABASE_URL) ----------
 
 function writeCsvMirror(all: ExtraRequest[]) {
   const esc = (v: unknown) => {
@@ -283,61 +297,128 @@ function writeCsvMirror(all: ExtraRequest[]) {
   try { fs.writeFileSync(REQUESTS_CSV, [header, ...lines].join('\n') + '\n'); } catch { /* mirror is best-effort */ }
 }
 
-function readRequests(): ExtraRequest[] {
+function readRequestsSync(): ExtraRequest[] {
   try { return JSON.parse(fs.readFileSync(REQUESTS, 'utf8')); } catch { return []; }
 }
 
-function writeRequests(all: ExtraRequest[]) {
+function writeRequestsSync(all: ExtraRequest[]) {
   fs.mkdirSync(path.dirname(REQUESTS), { recursive: true });
   fs.writeFileSync(REQUESTS, JSON.stringify(all, null, 2));
   writeCsvMirror(all);
-  triggerInstantImport();
 }
 
-// INSTANT hand-off: the moment a request is created/paid, run the
-// channel-manager's import (idempotent; the 15-min poll stays as safety net).
-// Fire-and-forget so the guest's request never waits on it.
-function triggerInstantImport() {
+// ---------- Turso-backed extras (production) ----------
+
+async function tursoAddRequest(req: ExtraRequest): Promise<void> {
+  const db = tursoDb()!;
   try {
-    const cmDir = path.dirname(path.dirname(CM_DB)); // .../channel-manager/db/dev.db → .../channel-manager
-    const script = path.join(cmDir, 'db', 'import-extras.mjs');
-    if (!fs.existsSync(script)) return;
-    spawn(process.execPath, [script, REQUESTS_CSV], { cwd: cmDir, detached: true, stdio: 'ignore' }).unref();
-  } catch { /* poll job will pick it up */ }
+    await db.execute({
+      sql: `INSERT INTO GuestExtraRequest (id, ref, guestName, extraId, extraName, date, time, nights, price, status, stripeSession, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [req.id, req.ref, req.guestName, req.extraId, req.extraName, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, req.status, req.stripeSession ?? null, req.createdAt],
+    });
+  } finally {
+    db.close();
+  }
 }
 
-export function addRequest(r: Omit<ExtraRequest, 'id' | 'createdAt'>): ExtraRequest {
-  const all = readRequests();
+async function tursoMarkPaid(stripeSession: string, all?: false): Promise<ExtraRequest | null>;
+async function tursoMarkPaid(stripeSession: string, all: true): Promise<ExtraRequest[]>;
+async function tursoMarkPaid(stripeSession: string, all = false): Promise<ExtraRequest | ExtraRequest[] | null> {
+  const db = tursoDb()!;
+  try {
+    await db.execute({
+      sql: `UPDATE GuestExtraRequest SET status = 'paid' WHERE stripeSession = ? AND status != 'paid'`,
+      args: [stripeSession],
+    });
+    const rs = await db.execute({
+      sql: `SELECT * FROM GuestExtraRequest WHERE stripeSession = ?`,
+      args: [stripeSession],
+    });
+    const rows = rs.rows.map(rowToExtraRequest);
+    return all ? rows : (rows[0] ?? null);
+  } finally {
+    db.close();
+  }
+}
+
+async function tursoRequestsForBooking(ref: string): Promise<ExtraRequest[]> {
+  const db = tursoDb()!;
+  try {
+    const rs = await db.execute({
+      sql: `SELECT * FROM GuestExtraRequest WHERE ref = ? COLLATE NOCASE AND status != 'pending-payment' ORDER BY createdAt`,
+      args: [ref],
+    });
+    return rs.rows.map(rowToExtraRequest);
+  } finally {
+    db.close();
+  }
+}
+
+function rowToExtraRequest(r: any): ExtraRequest {
+  return {
+    id: r.id,
+    ref: r.ref,
+    guestName: r.guestName,
+    extraId: r.extraId,
+    extraName: r.extraName,
+    date: r.date ?? null,
+    time: r.time ?? null,
+    nights: r.nights ?? null,
+    price: r.price,
+    status: r.status as ExtraRequest['status'],
+    stripeSession: r.stripeSession ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+// ---------- public API ----------
+
+export async function addRequest(r: Omit<ExtraRequest, 'id' | 'createdAt'>): Promise<ExtraRequest> {
   const req: ExtraRequest = {
     ...r,
     id: `EXT-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     createdAt: new Date().toISOString(),
   };
-  all.push(req);
-  writeRequests(all);
+  if (tursoDb()) {
+    await tursoAddRequest(req);
+  } else {
+    const all = readRequestsSync();
+    all.push(req);
+    writeRequestsSync(all);
+  }
   return req;
 }
 
-export function markRequestPaid(stripeSession: string): ExtraRequest | null {
-  const all = readRequests();
+export async function markRequestPaid(stripeSession: string): Promise<ExtraRequest | null> {
+  if (tursoDb()) {
+    return tursoMarkPaid(stripeSession, false);
+  }
+  const all = readRequestsSync();
   const req = all.find((r) => r.stripeSession === stripeSession);
   if (!req) return null;
-  if (req.status !== 'paid') { req.status = 'paid'; writeRequests(all); }
+  if (req.status !== 'paid') { req.status = 'paid'; writeRequestsSync(all); }
   return req;
 }
 
 // Marks ALL requests sharing a session ID (e.g. combined checkin-extras checkout).
-export function markAllRequestsPaid(stripeSession: string): ExtraRequest[] {
-  const all = readRequests();
+export async function markAllRequestsPaid(stripeSession: string): Promise<ExtraRequest[]> {
+  if (tursoDb()) {
+    return tursoMarkPaid(stripeSession, true) as Promise<ExtraRequest[]>;
+  }
+  const all = readRequestsSync();
   const matched = all.filter((r) => r.stripeSession === stripeSession);
   let changed = false;
   for (const req of matched) {
     if (req.status !== 'paid') { req.status = 'paid'; changed = true; }
   }
-  if (changed) writeRequests(all);
+  if (changed) writeRequestsSync(all);
   return matched;
 }
 
-export function requestsForBooking(ref: string): ExtraRequest[] {
-  return readRequests().filter((r) => r.ref.toLowerCase() === ref.toLowerCase() && r.status !== 'pending-payment');
+export async function requestsForBooking(ref: string): Promise<ExtraRequest[]> {
+  if (tursoDb()) {
+    return tursoRequestsForBooking(ref);
+  }
+  return readRequestsSync().filter((r) => r.ref.toLowerCase() === ref.toLowerCase() && r.status !== 'pending-payment');
 }

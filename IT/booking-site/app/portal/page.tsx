@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import ExtraCard from './ExtraCard';
-import { EXTRAS, EARLY_TIMES, LATE_TIMES, timeSlots } from '@/lib/extras';
+import { EXTRAS, EARLY_TIMES, LATE_TIMES, timeSlots, parkingExtraFor } from '@/lib/extras';
 import { currentProperty } from '@/lib/properties';
 import { findBookingByRef, requestsForBooking, verifyToken, PORTAL_COOKIE } from '@/lib/portal';
 import { stripeKeyFor } from '@/lib/stripe';
@@ -58,7 +58,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Recor
   }
 
   // ---------- logged in: extras ----------
-  const myRequests = requestsForBooking(booking.ref);
+  const myRequests = await requestsForBooking(booking.ref);
   const prop = currentProperty();
   const payNow = !!stripeKeyFor(prop.id);
 
@@ -121,7 +121,9 @@ export default async function PortalPage({ searchParams }: { searchParams: Recor
         Make your stay easier — request now, we confirm availability as soon as possible.
       </p>
       <div className="extras-grid">
-        {EXTRAS.filter((e) => e.id !== 'early-checkin' && e.id !== 'luggage').map((e) => (
+        {EXTRAS.filter((e) => e.id !== 'early-checkin' && e.id !== 'luggage')
+          .map((e) => e.id === 'parking' ? parkingExtraFor(prop.id, prop.checkin.parkingMapsUrl) : e)
+          .map((e) => (
           <ExtraCard
             key={e.id}
             extra={e}
