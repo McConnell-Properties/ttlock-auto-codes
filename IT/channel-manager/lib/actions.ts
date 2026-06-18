@@ -172,6 +172,7 @@ export async function sendPaymentLinkAction(bookingId: number): Promise<{ ok: bo
       successUrl,
       expiresHours: cfg.linkExpiryHours,
       reservationCode: b.channelRef,
+      propertyId: b.propertyId,
     });
 
     await sendEmail(
@@ -210,7 +211,7 @@ export async function syncStripeAction(): Promise<{ checked: number; paid: numbe
   for (const b of pending) {
     out.checked++;
     try {
-      const s = await getSessionStatus(b.stripeSessionId!);
+      const s = await getSessionStatus(b.stripeSessionId!, b.propertyId);
       if (s === 'paid') {
         await data.setBookingStripe(b.id, { stripeStatus: 'paid', paidAt: new Date().toISOString() });
         out.paid++;

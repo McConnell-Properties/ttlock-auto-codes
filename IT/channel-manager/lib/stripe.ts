@@ -3,17 +3,21 @@
 
 const API = 'https://api.stripe.com/v1';
 
-function key(): string {
+function key(propertyId?: string): string {
+  if (propertyId) {
+    const perProp = process.env[`STRIPE_SECRET_KEY_${propertyId.toUpperCase()}`];
+    if (perProp) return perProp;
+  }
   const k = process.env.STRIPE_SECRET_KEY;
   if (!k) throw new Error('STRIPE_SECRET_KEY is not set in .env');
   return k;
 }
 
-async function stripePost(path: string, params: Record<string, string>) {
+async function stripePost(path: string, params: Record<string, string>, propertyId?: string) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${key()}`,
+      Authorization: `Bearer ${key(propertyId)}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams(params).toString(),
@@ -23,9 +27,9 @@ async function stripePost(path: string, params: Record<string, string>) {
   return j;
 }
 
-async function stripeGet(path: string) {
+async function stripeGet(path: string, propertyId?: string) {
   const res = await fetch(`${API}${path}`, {
-    headers: { Authorization: `Bearer ${key()}` },
+    headers: { Authorization: `Bearer ${key(propertyId)}` },
   });
   const j = await res.json();
   if (j.error) throw new Error(`Stripe: ${j.error.message}`);
@@ -39,8 +43,8 @@ export async function createCheckoutSession(opts: {
   customerEmail?: string | null;
   successUrl: string;
   expiresHours?: number;
-  reservationCode?: string | null; // channel ref (e.g. BDC-…) — lets the existing
-  // GAS webhook keep the "Reservation Data" sheet's stripe_status in sync too
+  reservationCode?: string | null;
+  propertyId?: string; // selects STRIPE_SECRET_KEY_<PROPERTY> if set
 }) {
   const params: Record<string, string> = {
     mode: 'payment',
@@ -57,13 +61,13 @@ export async function createCheckoutSession(opts: {
     params['metadata[reservation_code]'] = opts.reservationCode;
   }
   if (opts.customerEmail) params.customer_email = opts.customerEmail;
-  const s = await stripePost('/checkout/sessions', params);
+  const s = await stripePost('/checkout/sessions', params, opts.propertyId);
   return { sessionId: s.id as string, url: s.url as string };
 }
 
 // Returns 'paid' | 'open' | 'expired'
-export async function getSessionStatus(sessionId: string): Promise<string> {
-  const s = await stripeGet(`/checkout/sessions/${sessionId}`);
+export async function getSessionStatus(sessionId: string, propertyId?: string): Promise<string> {
+  const s = await stripeGet(`/checkout/sessions/${sessionId}`, propertyId);
   if (s.payment_status === 'paid') return 'paid';
   if (s.status === 'expired') return 'expired';
   return 'open';
