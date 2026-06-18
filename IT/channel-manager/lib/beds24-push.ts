@@ -131,22 +131,11 @@ export async function runBeds24Push(opts: { dryRun?: boolean } = {}): Promise<Pu
     }
     const deduped = Array.from(latestByKey.values());
 
-    // Pre-fetch blocks for inventory rows
-    const invRoomTypeIds = [...new Set(
-      deduped.filter(r => r.field === 'inventory').map(r => r.roomTypeId)
-    )];
-    const blockByKey = new Map<string, number>();
-    if (invRoomTypeIds.length > 0) {
-      const ph = invRoomTypeIds.map(() => '?').join(',');
-      const blockRows = (await db.execute({
-        sql: `SELECT roomTypeId, date, SUM(units) AS units FROM Block
-              WHERE roomTypeId IN (${ph}) GROUP BY roomTypeId, date`,
-        args: invRoomTypeIds,
-      })).rows as unknown as Array<{ roomTypeId: number; date: string; units: number }>;
-      for (const b of blockRows) blockByKey.set(`${b.roomTypeId}|${b.date}`, Number(b.units));
-    }
-
     // Build per-room date profile map
+    // numAvail comes directly from row.value — pre-calculated by roomsToSell()
+    // (totalUnits - confirmed bookings - manual blocks) at the time the SyncJob was queued.
+    // The dedup step above keeps only the latest job per (roomTypeId, date, field),
+    // so the value reflects any bookings that arrived since the first queue call.
     const roomDateMap = new Map<number, Map<string, DateProfile>>();
     for (const row of deduped) {
       const roomId = row.beds24RoomId;
@@ -159,10 +148,7 @@ export async function runBeds24Push(opts: { dryRun?: boolean } = {}): Promise<Pu
       entry.ids.push(row.id);
       if (row.field === 'price')     entry.price    = row.value;
       if (row.field === 'minstay')   entry.minStay  = row.value;
-      if (row.field === 'inventory') {
-        const blocked = blockByKey.get(`${row.roomTypeId}|${row.date}`) ?? 0;
-        entry.numAvail = Math.max(0, row.totalUnits - blocked);
-      }
+      if (row.field === 'inventory') entry.numAvail = row.value;
     }
 
     // Per-room job ID tracking and field flags
