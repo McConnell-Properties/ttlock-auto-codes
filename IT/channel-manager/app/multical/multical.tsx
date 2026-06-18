@@ -343,7 +343,7 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
   return (
     <>
       {pending && <div className="mc-saving">Saving…</div>}
-      <div ref={calWrapRef} className="card cal-wrap">
+      <div ref={calWrapRef} className="card cal-wrap mc-wrap">
       <table className="cal mc" onMouseLeave={() => setSelDrag(null)}>
         <thead>
           <tr>
