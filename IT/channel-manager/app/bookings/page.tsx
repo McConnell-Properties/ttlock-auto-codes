@@ -21,13 +21,12 @@ export default async function BookingsPage({
         <Link href={`/bookings?status=cancelled${includePast ? '&past=1' : ''}`} className={status === 'cancelled' ? 'active' : ''}>Cancelled</Link>
         <Link href={`/bookings?status=all${includePast ? '&past=1' : ''}`} className={status === 'all' ? 'active' : ''}>All</Link>
         <Link href={`/bookings?status=${status}${includePast ? '' : '&past=1'}`} className={includePast ? 'active' : ''}>
-          {includePast ? 'Hiding past ✕' : 'Include past'}
+          {includePast ? 'Hiding past' : 'Include past'}
         </Link>
-        <Link href="/bookings/new" style={{ marginLeft: 'auto' }} className="btn">+ New booking</Link>
       </div>
       <div className="card">
         {bookings.length === 0 ? (
-          <p className="muted">No bookings yet. Add one with “+ New booking”.</p>
+          <p className="muted">No bookings found.</p>
         ) : (
           <table>
             <thead>
@@ -43,14 +42,14 @@ export default async function BookingsPage({
                   <td>{b.propertyName}</td>
                   <td>
                     {b.roomTypeName ?? <span className="badge pending">unallocated</span>}
-                    {b.physicalRoom ? <span className="muted"> · Rm {b.physicalRoom}</span> : ''}
-                    {b.units > 1 ? ` ×${b.units}` : ''}
+                    {b.physicalRoom ? <span className="muted"> &middot; Rm {b.physicalRoom}</span> : ''}
+                    {b.units > 1 ? ` x${b.units}` : ''}
                   </td>
                   <td>{b.checkIn}</td>
                   <td>{b.checkOut}</td>
                   <td><span className={`badge ${b.channel === 'booking.com' ? 'bdc' : b.channel}`}>{b.channel}</span></td>
-                  <td className="mono">{b.channelRef || '—'}</td>
-                  <td>{b.totalPrice != null ? `£${b.totalPrice}` : '—'}</td>
+                  <td className="mono">{b.channelRef || '-'}</td>
+                  <td>{b.totalPrice != null ? `${b.totalPrice}` : '-'}</td>
                   <td><span className={`badge ${b.status}`}>{b.status}</span></td>
                   <td>{b.status === 'confirmed' && <CancelButton id={b.id} />}</td>
                 </tr>

@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { extrasWindowOccupancy, dateRange, today } from '@/lib/data';
-import { EXTRAS, EXTRA_CAPACITY } from '@/lib/extras';
+import { extrasWindowOccupancy, dateRange, today, listExtraCapacities } from '@/lib/data';
+import { EXTRAS } from '@/lib/extras';
 import ExtrasCal from './extras-cal';
 
 export default async function ExtrasCalPage({
@@ -20,12 +20,16 @@ export default async function ExtrasCalPage({
     return d.toISOString().slice(0, 10);
   };
 
-  const entries = await extrasWindowOccupancy(start, end);
+  const [entries, capacities] = await Promise.all([
+    extrasWindowOccupancy(start, end),
+    listExtraCapacities(),
+  ]);
+  const capMap = Object.fromEntries(capacities.map((c) => [c.extraId, c.capacity]));
 
   const extras = EXTRAS.map((e) => ({
     id: e.id,
     label: e.label,
-    capacity: EXTRA_CAPACITY[e.id] ?? 1,
+    capacity: capMap[e.id] ?? 1,
   }));
 
   return (

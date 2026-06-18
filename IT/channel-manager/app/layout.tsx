@@ -14,13 +14,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav className="sidebar">
             <div className="brand">McConnell CM</div>
             <Link href="/">Dashboard</Link>
-            <Link href="/calendar">Calendar</Link>
             <Link href="/multical">Multi calendar</Link>
+            <Link href="/extras-cal">Extras cal</Link>
+            <Link href="/extras-capacity">Extras capacity</Link>
             <Link href="/crm">CRM</Link>
             <Link href="/bookings">Bookings</Link>
-            <Link href="/bookings/new">+ New booking</Link>
-            <Link href="/sync">Sync queue</Link>
-            <Link href="/properties">Properties</Link>
+            <Link href="/internal/dashboard">Inbox</Link>
           </nav>
           <main className="main">{children}</main>
         </div>

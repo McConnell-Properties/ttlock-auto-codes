@@ -310,3 +310,13 @@ export async function updatePropertyIds(propertyId: string, bdcHotelId: string, 
   await data.updateProperty(propertyId, bdcHotelId || null, expediaHotelId || null);
   revalidatePath('/properties');
 }
+
+export async function createExtrasRequestAction(bookingId: number, extraId: string) {
+  await data.insertExtrasRequest(bookingId, extraId);
+  revalidatePath('/extras-cal');
+}
+
+export async function deleteExtrasRequestAction(id: number) {
+  await data.deleteExtrasRequest(id);
+  revalidatePath('/extras-cal');
+}

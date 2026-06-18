@@ -1,5 +1,6 @@
 // Data layer — all SQL lives here.
 import { all, one, run } from './db';
+import { EXTRA_CAPACITY } from './extras';
 
 export type Property = {
   id: string;
@@ -140,6 +141,18 @@ export function listBookings(status?: string, includePast = false) {
 
 export function getBooking(id: number) {
   return one<Booking>(`SELECT * FROM Booking WHERE id = ?`, [id]);
+}
+
+export function bookingsInRange(start: string, end: string) {
+  return all<BookingWithRoom>(
+    `SELECT b.*, rt.name AS roomTypeName, p.name AS propertyName
+     FROM Booking b
+     LEFT JOIN RoomType rt ON rt.id = b.roomTypeId
+     JOIN Property p ON p.id = b.propertyId
+     WHERE b.status = 'confirmed' AND b.checkIn < ? AND b.checkOut > ?
+     ORDER BY b.checkIn LIMIT 100`,
+    [end, start]
+  );
 }
 
 export async function insertBooking(b: {
@@ -808,6 +821,18 @@ export type ExtrasTask = {
   checkOut: string | null;
 };
 
+export async function deleteExtrasRequest(id: number): Promise<void> {
+  await run(`DELETE FROM ExtrasRequest WHERE id = ?`, [id]);
+}
+
+export async function insertExtrasRequest(bookingId: number, extraId: string): Promise<void> {
+  await run(
+    `INSERT OR IGNORE INTO ExtrasRequest (bookingReference, bookingId, extra, sourceStatus, price)
+     VALUES (?, ?, ?, 'paid', 0)`,
+    [`MANUAL-${bookingId}-${extraId}`, bookingId, extraId]
+  );
+}
+
 export function extrasTasks(includeDone = false) {
   return all<ExtrasTask>(
     `SELECT e.*, b.guestName, p.name AS propertyName, b.physicalRoom, b.checkIn, b.checkOut
@@ -853,20 +878,46 @@ export type ExtrasOccupancyRow = {
   id: number;
   bookingId: number;
   extra: string;
+  bookingReference: string | null;
   checkIn: string;
   checkOut: string;
   guestName: string;
   physicalRoom: string | null;
   channelRef: string | null;
   channel: string;
+  propertyName: string;
 };
+
+export type ExtraCapacityRow = { extraId: string; capacity: number };
+
+export async function listExtraCapacities(): Promise<ExtraCapacityRow[]> {
+  try {
+    const rows = await all<ExtraCapacityRow>('SELECT extraId, capacity FROM ExtraCapacity ORDER BY extraId');
+    if (rows.length > 0) return rows;
+  } catch { /* table may not exist yet */ }
+  return Object.entries(EXTRA_CAPACITY).map(([extraId, capacity]) => ({ extraId, capacity }));
+}
+
+export async function setExtraCapacity(extraId: string, capacity: number): Promise<void> {
+  await run(
+    `INSERT INTO ExtraCapacity (extraId, capacity) VALUES (?, ?)
+     ON CONFLICT(extraId) DO UPDATE SET capacity = excluded.capacity`,
+    [extraId, capacity]
+  );
+}
 
 /** Count of PAID extras of a given type whose booking covers `date`. */
 export async function extraAvailable(extraId: string, date: string): Promise<number> {
-  const cap = await one<{ capacity: number }>(
-    `SELECT capacity FROM ExtraCapacity WHERE extraId = ?`, [extraId]
-  );
-  if (!cap) return 0;
+  const fallbackCap = EXTRA_CAPACITY[extraId] ?? 1;
+  let cap: number;
+  try {
+    const row = await one<{ capacity: number }>(
+      `SELECT capacity FROM ExtraCapacity WHERE extraId = ?`, [extraId]
+    );
+    cap = row?.capacity ?? fallbackCap;
+  } catch {
+    cap = fallbackCap;
+  }
   const row = await one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM ExtrasRequest e
      JOIN Booking b ON b.id = e.bookingId
@@ -875,16 +926,18 @@ export async function extraAvailable(extraId: string, date: string): Promise<num
        AND b.checkIn <= ? AND b.checkOut > ?`,
     [extraId, date, date]
   );
-  return Math.max(0, cap.capacity - (row?.n ?? 0));
+  return Math.max(0, cap - (row?.n ?? 0));
 }
 
 /** All PAID extras whose linked booking overlaps [start, end) — for the extras calendar. */
 export function extrasWindowOccupancy(start: string, end: string) {
   return all<ExtrasOccupancyRow>(
-    `SELECT e.id, e.bookingId, e.extra,
-            b.checkIn, b.checkOut, b.guestName, b.physicalRoom, b.channelRef, b.channel
+    `SELECT e.id, e.bookingId, e.extra, e.bookingReference,
+            b.checkIn, b.checkOut, b.guestName, b.physicalRoom, b.channelRef, b.channel,
+            p.name AS propertyName
      FROM ExtrasRequest e
      JOIN Booking b ON b.id = e.bookingId
+     JOIN Property p ON p.id = b.propertyId
      WHERE e.sourceStatus = 'paid'
        AND b.status = 'confirmed'
        AND b.checkIn < ? AND b.checkOut > ?
