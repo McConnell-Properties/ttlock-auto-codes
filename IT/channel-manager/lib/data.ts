@@ -1123,3 +1123,58 @@ export async function markBookingBySession(
   );
   return Number(rs.rowsAffected ?? 0);
 }
+
+// --- Internal reports ---
+
+export type ChannelStat = { channel: string; count: number; revenue: number };
+export type PropertyStat = { name: string; count: number; revenue: number };
+export type DayArrival = { checkIn: string; count: number };
+
+export function reportsByChannel(days: number) {
+  return all<ChannelStat>(
+    `SELECT channel, COUNT(*) as count, COALESCE(SUM(totalPrice), 0) as revenue
+     FROM Booking
+     WHERE status = 'confirmed' AND checkIn >= date('now', ?)
+     GROUP BY channel ORDER BY revenue DESC`,
+    [`-${days} days`]
+  );
+}
+
+export function reportsByProperty(days: number) {
+  return all<PropertyStat>(
+    `SELECT p.name, COUNT(*) as count, COALESCE(SUM(b.totalPrice), 0) as revenue
+     FROM Booking b JOIN Property p ON p.id = b.propertyId
+     WHERE b.status = 'confirmed' AND b.checkIn >= date('now', ?)
+     GROUP BY b.propertyId ORDER BY revenue DESC`,
+    [`-${days} days`]
+  );
+}
+
+export function upcomingArrivals(days = 7) {
+  return all<DayArrival>(
+    `SELECT checkIn, COUNT(*) as count FROM Booking
+     WHERE status = 'confirmed' AND checkIn >= date('now') AND checkIn < date('now', ?)
+     GROUP BY checkIn ORDER BY checkIn`,
+    [`+${days} days`]
+  );
+}
+
+export function reportsKpi() {
+  return one<{
+    currentGuests: number;
+    arrivalsToday: number;
+    departuresToday: number;
+    unallocatedFuture: number;
+    revenue30: number;
+    bookings30: number;
+  }>(
+    `SELECT
+       SUM(CASE WHEN checkIn <= date('now') AND checkOut > date('now') THEN 1 ELSE 0 END) as currentGuests,
+       SUM(CASE WHEN checkIn = date('now') THEN 1 ELSE 0 END) as arrivalsToday,
+       SUM(CASE WHEN checkOut = date('now') THEN 1 ELSE 0 END) as departuresToday,
+       SUM(CASE WHEN checkOut > date('now') AND physicalRoom IS NULL THEN 1 ELSE 0 END) as unallocatedFuture,
+       COALESCE(SUM(CASE WHEN checkIn >= date('now', '-30 days') THEN totalPrice ELSE 0 END), 0) as revenue30,
+       SUM(CASE WHEN checkIn >= date('now', '-30 days') THEN 1 ELSE 0 END) as bookings30
+     FROM Booking WHERE status = 'confirmed'`
+  );
+}

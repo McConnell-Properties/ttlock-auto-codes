@@ -351,6 +351,66 @@ Identical pattern to 693518. `{"success":true}` only — no `modified`, no diagn
 
 ---
 
+## 2026-06-19 · ACTION FOR P1 · Guest inbox — scope check + Message table pull (PM-approved)
+
+**PM sign-off:** Pre-approved. Additive migration, low-risk. Proceed.
+
+### Your two tasks
+
+**Task 1 — Scope check (do first, unblocks Task 2):**
+Verify that the Beds24 API token has `bookings-personal` scope (needed to read guest messages via `GET /bookings/messages`). If not, generate a new invite code with the correct scope and update `BEDS24_REFRESH_TOKEN` in Vercel env vars. Report the scope status in this ledger before proceeding.
+
+**Task 2 — Message pull (webhook + poll):**
+Pull guest messages from Beds24 `GET /bookings/messages` into a `Message` table in Turso. P2 owns the schema (agreed below) and will build the inbox UI once rows are flowing.
+
+**Agreed Message table schema** (P2 finalized, P1 confirm each column maps from the Beds24 response):
+
+```sql
+CREATE TABLE Message (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  bookingId         INTEGER REFERENCES Booking(id),
+  beds24MessageId   TEXT UNIQUE NOT NULL,
+  direction         TEXT NOT NULL CHECK(direction IN ('inbound', 'outbound')),
+  body              TEXT NOT NULL,
+  sentAt            TEXT NOT NULL,
+  readAt            TEXT,
+  channel           TEXT,
+  createdAt         TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_message_bookingId ON Message(bookingId);
+CREATE INDEX idx_message_sentAt    ON Message(sentAt DESC);
+```
+
+- `beds24MessageId` is the dedupe key — INSERT OR IGNORE on re-pull
+- `direction`: `inbound` = guest→host, `outbound` = host→guest
+- `readAt`: null = unread; set to ISO timestamp when marked read
+- `channel`: from the booking (bdc, direct, airbnb…) — for inbox filter UI
+- `bookingId`: look up via `Booking.channelRef` match on the Beds24 booking reference
+
+**Pull mechanism:** webhook-driven preferred (Beds24 fires on new message), with a 15-min poll backstop covering missed webhooks. Same pattern as beds24-pull.
+
+**Migration file:** create `db/migrate-message-table.mjs` (idempotent, dry-run by default). Flag as NEEDS-PM in this ledger before running `--live`.
+
+---
+
+## 2026-06-19 · REQUEST FROM P2 · Guest inbox + reports in CMS
+
+**From:** P2 CMS dev
+**To:** P1 Beds24 API
+**Context:** `/internal/dashboard` is live and auth-gated behind the CMS login. It currently shows a 503 because `BLOB_INBOX_URL` and `BLOB_REPORTS_URL` are not set — those were placeholders for blob-hosted HTML files that don't exist yet.
+
+**The ask:** What does the Beds24 API expose for guest messaging and reports? Specifically:
+
+1. **Guest inbox** — Is there a `/inbox` or `/messages` endpoint in Beds24 v2? Can we pull unread/recent guest messages and render them as a native CMS page (no blob needed)?
+
+2. **Reports** — What stats/analytics endpoints exist? (Occupancy, revenue, booking counts by channel/property/period.) Same question — can we build a native Next.js page from API data?
+
+3. **Alternative** — If Beds24 has a web UI URL for their message center or reports that allows iframe embedding (no X-Frame-Options block), that's also fine. Just need the URL.
+
+**P2 will build whichever approach works.** Either native API pages in `app/internal/dashboard/` or iframe to a Beds24 URL. Report back in this ledger with what's available and P2 will implement.
+
+---
+
 ## 2026-06-17 · REPORT · Config diff — 693520 (works) vs 693518/693503 (fails)
 
 **Goal:** Find the API-visible field that distinguishes 693520 (accepts numAvail) from 693518/693503 (drops numAvail), and cross-check 693503 as confirmation.
