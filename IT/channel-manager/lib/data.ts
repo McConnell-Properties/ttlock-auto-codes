@@ -43,6 +43,9 @@ export type Booking = {
   stripeStatus: string | null; // link_sent | paid | expired
   paidAt: string | null;
   createdAt: string;
+  originPropertyId: string | null;
+  originRoomTypeId: number | null;
+  originPhysicalRoom: string | null;
 };
 
 export type SyncJob = {
@@ -250,9 +253,21 @@ export async function moveBooking(bookingId: number, target: MoveTarget, force =
     newRoomTypeId = crossProperty ? null : b.roomTypeId;
   }
 
+  // Capture origin on first move only — never overwrite once set.
   await run(
-    `UPDATE Booking SET propertyId = ?, physicalRoom = ?, roomTypeId = ?, checkIn = ?, checkOut = ? WHERE id = ?`,
-    [newPropertyId, target.physicalRoom, newRoomTypeId, newCheckIn, newCheckOut, bookingId]
+    `UPDATE Booking SET
+       propertyId         = ?,
+       physicalRoom       = ?,
+       roomTypeId         = ?,
+       checkIn            = ?,
+       checkOut           = ?,
+       originPropertyId   = CASE WHEN originPropertyId IS NULL THEN ? ELSE originPropertyId END,
+       originRoomTypeId   = CASE WHEN originPropertyId IS NULL THEN ? ELSE originRoomTypeId END,
+       originPhysicalRoom = CASE WHEN originPropertyId IS NULL THEN ? ELSE originPhysicalRoom END
+     WHERE id = ?`,
+    [newPropertyId, target.physicalRoom ?? null, newRoomTypeId, newCheckIn, newCheckOut,
+     b.propertyId, b.roomTypeId, b.physicalRoom,
+     bookingId]
   );
   return {
     ok: true,

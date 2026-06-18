@@ -153,6 +153,7 @@ label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px
   padding: 0 4px; white-space: nowrap; overflow: hidden;
 }
 .mc-cont { display: block; height: 30px; }
+.mc-moved { font-size: 9px; opacity: 0.7; margin-left: 2px; vertical-align: middle; }
 .mc-checkin { border-left: 3px solid rgba(0,0,0,0.35) !important; }
 .bar-bdc { background: #cfe0fb; }
 .bar-expedia { background: #fde9c8; }

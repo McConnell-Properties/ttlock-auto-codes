@@ -23,6 +23,9 @@ type B = {
   notes: string | null;
   stripeStatus: string | null;
   stripePaymentUrl: string | null;
+  originPropertyId: string | null;
+  originRoomTypeId: number | null;
+  originPhysicalRoom: string | null;
 };
 
 type Group = {
@@ -334,6 +337,7 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
               className={isStart ? 'mc-name' : 'mc-cont'}
             >
               {isStart ? shortName(b.guestName) : ' '}
+              {isStart && b.originPhysicalRoom ? <span className="mc-moved" title={`Moved from room ${b.originPhysicalRoom}`}>↗</span> : null}
             </span>
           )}
         </td>
@@ -485,6 +489,13 @@ export default function MultiCal({ groups, dates: initDates, rates: initRates, b
                 </button>
               )}
             </div>
+
+            {sel.originPhysicalRoom && (
+              <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff8e1', borderRadius: 6, fontSize: 12.5 }}>
+                <span className="badge" style={{ background: '#f59e0b', color: '#fff', marginRight: 6 }}>moved</span>
+                Origin: {groups.find((g) => g.id === sel.originPropertyId)?.name ?? sel.originPropertyId} · Room {sel.originPhysicalRoom}
+              </div>
+            )}
 
             <div className="row">
               <button disabled={pending || !edit.ci || !edit.co || edit.co <= edit.ci} onClick={saveEdit}>
