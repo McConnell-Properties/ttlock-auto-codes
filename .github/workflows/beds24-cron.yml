@@ -2,8 +2,8 @@ name: beds24-cron
 
 on:
   schedule:
-    # Every 10 minutes — push inventory, pull bookings from Beds24, sync booking mirror
-    - cron: '*/10 * * * *'
+    # Every 5 minutes — push inventory, pull bookings from Beds24, sync booking mirror
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
