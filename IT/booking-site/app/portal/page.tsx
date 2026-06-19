@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import ExtraCard from './ExtraCard';
-import { EXTRAS, EARLY_TIMES, LATE_TIMES, timeSlots } from '@/lib/extras';
+import { EXTRAS, EARLY_TIMES, LATE_TIMES, timeSlots, parkingExtraFor } from '@/lib/extras';
 import { currentProperty } from '@/lib/properties';
 import { findBookingByRef, requestsForBooking, verifyToken, PORTAL_COOKIE } from '@/lib/portal';
 import { stripeKeyFor } from '@/lib/stripe';
@@ -58,7 +58,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Recor
   }
 
   // ---------- logged in: extras ----------
-  const myRequests = requestsForBooking(booking.ref);
+  const myRequests = await requestsForBooking(booking.ref);
   const prop = currentProperty();
   const payNow = !!stripeKeyFor(prop.id);
 
@@ -124,7 +124,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Recor
         {EXTRAS.filter((e) => e.id !== 'early-checkin' && e.id !== 'luggage').map((e) => (
           <ExtraCard
             key={e.id}
-            extra={e}
+            extra={e.id === 'parking' ? parkingExtraFor(prop.id) : e}
             checkIn={booking.checkIn}
             checkOut={booking.checkOut}
             timeSlots={timeSlots()}

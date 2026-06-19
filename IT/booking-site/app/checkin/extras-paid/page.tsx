@@ -23,7 +23,7 @@ export default async function CheckinExtrasPaidPage({
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       if (session.payment_status === 'paid') {
-        markAllRequestsPaid(sessionId);
+        await markAllRequestsPaid(sessionId);
         markCardSaved(ref); // card saved via setup_future_usage: off_session
       }
     } catch { /* fall through */ }

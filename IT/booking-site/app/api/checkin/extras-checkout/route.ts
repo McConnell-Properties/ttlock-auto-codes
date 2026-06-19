@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   if (!stripeKey) {
     // No live Stripe key — auto-confirm and continue (test mode).
     if (earlyCheckin) {
-      addRequest({
+      await addRequest({
         ref, guestName: booking.guestName, extraId: 'early-checkin',
         extraName: `Early check-in at ${earlyCheckin}`,
         date: booking.checkIn, time: earlyCheckin === '1pm' ? '13:00' : '14:00',
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       });
     }
     if (luggageDate && luggageNights) {
-      addRequest({
+      await addRequest({
         ref, guestName: booking.guestName, extraId: 'luggage',
         extraName: 'Luggage drop-off',
         date: luggageDate, time: luggageTime, nights: luggageNights,
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   // Parking line item.
   if (parkingDate && parkingNights) {
-    if (!rangeAvailable('parking', parkingDate, parkingNights)) {
+    if (!(await rangeAvailable('parking', parkingDate, parkingNights))) {
       return NextResponse.redirect(`${SITE}/checkin?step=3&error=soldout`, 303);
     }
     parkingTotal = await calendarExtraTotal('parking', parkingDate, parkingNights, prop.id);
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
 
   // Add pending-payment requests (both share the same session ID).
   if (earlyCheckin) {
-    addRequest({
+    await addRequest({
       ref, guestName: booking.guestName, extraId: 'early-checkin',
       extraName: `Early check-in at ${earlyCheckin}`,
       date: booking.checkIn, time: earlyCheckin === '1pm' ? '13:00' : '14:00',
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     });
   }
   if (parkingDate && parkingNights) {
-    addRequest({
+    await addRequest({
       ref, guestName: booking.guestName, extraId: 'parking',
       extraName: 'Parking',
       date: parkingDate, time: null, nights: parkingNights,
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
     });
   }
   if (luggageDate && luggageNights) {
-    addRequest({
+    await addRequest({
       ref, guestName: booking.guestName, extraId: 'luggage',
       extraName: 'Luggage drop-off',
       date: luggageDate, time: luggageTime, nights: luggageNights,

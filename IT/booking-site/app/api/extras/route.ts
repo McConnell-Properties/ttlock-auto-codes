@@ -56,15 +56,23 @@ export async function POST(req: NextRequest) {
   const returnPath = String(form.get('returnPath') ?? '').trim();
   const safeReturn = returnPath.startsWith('/') ? returnPath : '';
 
+  const guestType = String(form.get('guestType') ?? '').trim() || 'adult';
+
   // ---- price ----
   let price: number;
   if (extra.calendar) {
-    // aircon / parking: date + nights against live availability & dynamic pricing
     if (!date || !nights) return NextResponse.redirect(`${SITE}/portal?error=3`, 303);
-    if (!rangeAvailable(extra.id as 'aircon' | 'parking', date, nights)) {
+    if (!(await rangeAvailable(extra.id, date, nights))) {
       return NextResponse.redirect(`${SITE}/portal?error=soldout&extra=${extra.id}`, 303);
     }
-    price = await calendarExtraTotal(extra.id as 'aircon' | 'parking', date, nights, prop.id);
+    if (extra.id === 'cooking-pack') {
+      price = 15; // flat hire fee
+    } else if (extra.id === 'extra-guest-double' || extra.id === 'extra-guest-single') {
+      const rate = guestType === 'child' ? 2.5 : 5;
+      price = Math.round((rate * nights + 10) * 100) / 100;
+    } else {
+      price = await calendarExtraTotal(extra.id as 'aircon' | 'parking', date, nights, prop.id);
+    }
   } else if (extra.id === 'early-checkin') {
     // Deadline-aware pricing: £10→£15 for 1pm, £5→£10 for 2pm after 20:00 UK the day before check-in.
     const bk = await findBookingByRef(ref);
@@ -85,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   // Free extras, or no Stripe configured → auto-confirmed immediately.
   if (price === 0 || !stripeKey) {
-    addRequest({
+    await addRequest({
       ref, guestName, extraId: extra.id, extraName: extra.name,
       date, time, nights, price,
       status: 'confirmed', stripeSession: null,
@@ -114,7 +122,7 @@ export async function POST(req: NextRequest) {
     success_url: `${SITE}/portal/extra-paid?session_id={CHECKOUT_SESSION_ID}${safeReturn ? `&returnTo=${encodeURIComponent(safeReturn)}` : ''}`,
     cancel_url: safeReturn ? `${SITE}${safeReturn}` : `${SITE}/portal`,
   });
-  addRequest({
+  await addRequest({
     ref, guestName, extraId: extra.id, extraName: extra.name,
     date, time, nights, price,
     status: 'pending-payment', stripeSession: session.id,

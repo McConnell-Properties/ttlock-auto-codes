@@ -3,7 +3,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { createClient } from '@libsql/client';
 
 const CHECKIN_DATA =
@@ -15,17 +14,24 @@ const RES_STATUS =
 const CM_DB = path.resolve(process.cwd(), process.env.CM_DB_PATH || '../channel-manager/db/dev.db');
 const SECRET = process.env.PORTAL_SECRET || 'change-me-portal-secret';
 const REQUESTS = path.join(process.cwd(), '.data', 'extras-requests.json');
+const REQUESTS_CSV = path.join(process.cwd(), '.data', 'extras-requests.csv');
+
+function tursoDb() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  return createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN || '' });
+}
 
 export type GuestBooking = {
   ref: string;
   guestName: string;
   checkIn: string;
   checkOut: string;
-  room: string | null; // e.g. "Room 4"
+  room: string | null;
   arrivalTime: string | null;
   lockCode: string | null;
-  stripeLink: string | null;   // deposit checkout URL from the existing pipeline
-  stripeStatus: string | null; // e.g. 'hold_active', 'captured', 'link_generated'
+  stripeLink: string | null;
+  stripeStatus: string | null;
 };
 
 // ---------- lookup ----------
@@ -110,10 +116,16 @@ function fromReservationStatus(ref: string): Partial<GuestBooking> | null {
 
 async function fromChannelManager(ref: string): Promise<Partial<GuestBooking> | null> {
   try {
-    const db = createClient({ url: `file:${CM_DB}` });
+    const db = process.env.DATABASE_URL
+      ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+      : createClient({ url: `file:${CM_DB}` });
     const rs = await db.execute({
-      sql: `SELECT guestName, checkIn, checkOut, physicalRoom, channelRef FROM Booking
-            WHERE status = 'confirmed' AND channelRef = ? COLLATE NOCASE ORDER BY checkIn LIMIT 1`,
+      sql: `SELECT b.guestName, b.checkIn, b.checkOut, b.physicalRoom, b.channelRef,
+                   b.stripePaymentUrl, b.stripeStatus, b.lockCode, c.arrivalTime
+            FROM Booking b
+            LEFT JOIN CrmRecord c ON c.bookingId = b.id
+            WHERE b.status = 'confirmed' AND b.channelRef = ? COLLATE NOCASE
+            ORDER BY b.checkIn LIMIT 1`,
       args: [ref.trim()],
     });
     if (!rs.rows.length) return null;
@@ -124,20 +136,20 @@ async function fromChannelManager(ref: string): Promise<Partial<GuestBooking> | 
       checkIn: r.checkIn,
       checkOut: r.checkOut,
       room: r.physicalRoom ? `Room ${r.physicalRoom}` : null,
-      arrivalTime: null,
-      lockCode: null,
+      arrivalTime: r.arrivalTime || null,
+      lockCode: r.lockCode || null,
+      stripeLink: r.stripePaymentUrl || null,
+      stripeStatus: r.stripeStatus || null,
     };
   } catch {
     return null;
   }
 }
 
-// Lookup without the surname check — for already-authenticated sessions only.
 export async function findBookingByRef(ref: string): Promise<GuestBooking | null> {
   const sources = [fromCheckinData(ref), fromReservationStatus(ref), await fromChannelManager(ref)];
   const found = sources.filter(Boolean) as Partial<GuestBooking>[];
   if (!found.length) return null;
-  // merge: first source wins per field (checkin_data has the lock code)
   const merged: GuestBooking = {
     ref, guestName: '', checkIn: '', checkOut: '', room: null, arrivalTime: null, lockCode: null,
     stripeLink: null, stripeStatus: null,
@@ -162,9 +174,6 @@ export async function findGuestBooking(ref: string, surname: string): Promise<Gu
   return merged;
 }
 
-// Login by guest details: first name + last name + exact check-in/check-out.
-// Searches checkin_data.json, reservation_status.csv and the channel-manager
-// DB; returns the merged booking (so the door code comes along when present).
 export async function findGuestBookingByDetails(
   firstName: string,
   lastName: string,
@@ -179,7 +188,7 @@ export async function findGuestBookingByDetails(
     return s.includes(f) && s.includes(l);
   };
 
-  // 1. checkin_data.json (keyed by booking ref)
+  // 1. checkin_data.json
   try {
     const data = JSON.parse(fs.readFileSync(CHECKIN_DATA, 'utf8'));
     for (const [key, r] of Object.entries<any>(data)) {
@@ -208,9 +217,11 @@ export async function findGuestBookingByDetails(
     }
   } catch { /* next source */ }
 
-  // 3. channel-manager DB (direct bookings)
+  // 3. channel-manager DB (Turso on Vercel, local SQLite in dev)
   try {
-    const db = createClient({ url: `file:${CM_DB}` });
+    const db = process.env.DATABASE_URL
+      ? createClient({ url: process.env.DATABASE_URL, authToken: process.env.DATABASE_AUTH_TOKEN || '' })
+      : createClient({ url: `file:${CM_DB}` });
     const rs = await db.execute({
       sql: `SELECT guestName, channelRef FROM Booking
             WHERE status = 'confirmed' AND checkIn = ? AND checkOut = ? AND channelRef IS NOT NULL`,
@@ -224,12 +235,12 @@ export async function findGuestBookingByDetails(
   return null;
 }
 
-// ---------- session token (HMAC-signed, httpOnly cookie) ----------
+// ---------- session token ----------
 
 export const PORTAL_COOKIE = 'guest_session';
 
 export function makeToken(ref: string): string {
-  const exp = Date.now() + 7 * 24 * 3600 * 1000; // 7 days
+  const exp = Date.now() + 7 * 24 * 3600 * 1000;
   const payload = `${ref}|${exp}`;
   const sig = crypto.createHmac('sha256', SECRET).update(payload).digest('hex').slice(0, 32);
   return Buffer.from(`${payload}|${sig}`).toString('base64url');
@@ -252,8 +263,8 @@ export function verifyToken(token: string | undefined): string | null {
 // ---------- extras requests ledger ----------
 
 export type ExtraRequest = {
-  id: string; // request id
-  ref: string; // booking ref
+  id: string;
+  ref: string;
   guestName: string;
   extraId: string;
   extraName: string;
@@ -266,9 +277,7 @@ export type ExtraRequest = {
   createdAt: string;
 };
 
-// CSV mirror of the requests ledger — easy pickup for the CRM / channel-manager
-// agent (one row per request, appended on every change).
-const REQUESTS_CSV = path.join(process.cwd(), '.data', 'extras-requests.csv');
+// ---------- flat-file fallback (local dev, no DATABASE_URL) ----------
 
 function writeCsvMirror(all: ExtraRequest[]) {
   const esc = (v: unknown) => {
@@ -280,64 +289,143 @@ function writeCsvMirror(all: ExtraRequest[]) {
     [r.id, r.ref, r.guestName, r.extraId, r.extraName, r.date, r.time, r.nights, r.price.toFixed(2), r.status, r.stripeSession, r.createdAt]
       .map(esc).join(',')
   );
-  try { fs.writeFileSync(REQUESTS_CSV, [header, ...lines].join('\n') + '\n'); } catch { /* mirror is best-effort */ }
+  try { fs.writeFileSync(REQUESTS_CSV, [header, ...lines].join('\n') + '\n'); } catch { /* best-effort */ }
 }
 
-function readRequests(): ExtraRequest[] {
+function readRequestsSync(): ExtraRequest[] {
   try { return JSON.parse(fs.readFileSync(REQUESTS, 'utf8')); } catch { return []; }
 }
 
-function writeRequests(all: ExtraRequest[]) {
+function writeRequestsSync(all: ExtraRequest[]) {
   fs.mkdirSync(path.dirname(REQUESTS), { recursive: true });
   fs.writeFileSync(REQUESTS, JSON.stringify(all, null, 2));
   writeCsvMirror(all);
-  triggerInstantImport();
 }
 
-// INSTANT hand-off: the moment a request is created/paid, run the
-// channel-manager's import (idempotent; the 15-min poll stays as safety net).
-// Fire-and-forget so the guest's request never waits on it.
-function triggerInstantImport() {
+// ---------- Turso-backed extras ----------
+
+async function tursoAddRequest(req: ExtraRequest): Promise<void> {
+  const db = tursoDb()!;
+  const cmStatus = req.status === 'pending-payment' ? 'pending' : 'paid';
   try {
-    const cmDir = path.dirname(path.dirname(CM_DB)); // .../channel-manager/db/dev.db → .../channel-manager
-    const script = path.join(cmDir, 'db', 'import-extras.mjs');
-    if (!fs.existsSync(script)) return;
-    spawn(process.execPath, [script, REQUESTS_CSV], { cwd: cmDir, detached: true, stdio: 'ignore' }).unref();
-  } catch { /* poll job will pick it up */ }
+    await db.batch([
+      {
+        sql: `INSERT INTO GuestExtraRequest (id, ref, guestName, extraId, extraName, date, time, nights, price, status, stripeSession, createdAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [req.id, req.ref, req.guestName, req.extraId, req.extraName, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, req.status, req.stripeSession ?? null, req.createdAt],
+      },
+      // Mirror into ExtrasRequest so the CM extras-cal shows portal bookings.
+      {
+        sql: `INSERT OR IGNORE INTO ExtrasRequest (bookingReference, bookingId, extra, date, time, nights, price, sourceStatus, raw)
+              SELECT ?, b.id, ?, ?, ?, ?, ?, ?, ?
+              FROM Booking b WHERE b.channelRef = ? COLLATE NOCASE LIMIT 1`,
+        args: [req.ref, req.extraId, req.date ?? null, req.time ?? null, req.nights ?? null, req.price, cmStatus, JSON.stringify({ extraName: req.extraName, portalId: req.id }), req.ref],
+      },
+    ], 'write');
+  } finally {
+    db.close();
+  }
 }
 
-export function addRequest(r: Omit<ExtraRequest, 'id' | 'createdAt'>): ExtraRequest {
-  const all = readRequests();
+async function tursoMarkPaid(stripeSession: string, all?: false): Promise<ExtraRequest | null>;
+async function tursoMarkPaid(stripeSession: string, all: true): Promise<ExtraRequest[]>;
+async function tursoMarkPaid(stripeSession: string, all = false): Promise<ExtraRequest | ExtraRequest[] | null> {
+  const db = tursoDb()!;
+  try {
+    await db.execute({
+      sql: `UPDATE GuestExtraRequest SET status = 'paid' WHERE stripeSession = ? AND status != 'paid'`,
+      args: [stripeSession],
+    });
+    const rs = await db.execute({
+      sql: `SELECT * FROM GuestExtraRequest WHERE stripeSession = ?`,
+      args: [stripeSession],
+    });
+    const rows = rs.rows.map(rowToExtraRequest);
+    // Promote CM mirror rows so they appear on extras-cal.
+    for (const r of rows) {
+      await db.execute({
+        sql: `UPDATE ExtrasRequest SET sourceStatus = 'paid'
+              WHERE bookingReference = ? AND extra = ?
+                AND COALESCE(date,'') = COALESCE(?,'') AND COALESCE(time,'') = COALESCE(?,'')`,
+        args: [r.ref, r.extraId, r.date ?? null, r.time ?? null],
+      });
+    }
+    return all ? rows : (rows[0] ?? null);
+  } finally {
+    db.close();
+  }
+}
+
+async function tursoRequestsForBooking(ref: string): Promise<ExtraRequest[]> {
+  const db = tursoDb()!;
+  try {
+    const rs = await db.execute({
+      sql: `SELECT * FROM GuestExtraRequest WHERE ref = ? COLLATE NOCASE AND status != 'pending-payment' ORDER BY createdAt`,
+      args: [ref],
+    });
+    return rs.rows.map(rowToExtraRequest);
+  } finally {
+    db.close();
+  }
+}
+
+function rowToExtraRequest(r: any): ExtraRequest {
+  return {
+    id: r.id,
+    ref: r.ref,
+    guestName: r.guestName,
+    extraId: r.extraId,
+    extraName: r.extraName,
+    date: r.date ?? null,
+    time: r.time ?? null,
+    nights: r.nights ?? null,
+    price: r.price,
+    status: r.status as ExtraRequest['status'],
+    stripeSession: r.stripeSession ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+// ---------- public API ----------
+
+export async function addRequest(r: Omit<ExtraRequest, 'id' | 'createdAt'>): Promise<ExtraRequest> {
   const req: ExtraRequest = {
     ...r,
     id: `EXT-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     createdAt: new Date().toISOString(),
   };
-  all.push(req);
-  writeRequests(all);
+  if (tursoDb()) {
+    await tursoAddRequest(req);
+  } else {
+    const all = readRequestsSync();
+    all.push(req);
+    writeRequestsSync(all);
+  }
   return req;
 }
 
-export function markRequestPaid(stripeSession: string): ExtraRequest | null {
-  const all = readRequests();
+export async function markRequestPaid(stripeSession: string): Promise<ExtraRequest | null> {
+  if (tursoDb()) return tursoMarkPaid(stripeSession, false);
+  const all = readRequestsSync();
   const req = all.find((r) => r.stripeSession === stripeSession);
   if (!req) return null;
-  if (req.status !== 'paid') { req.status = 'paid'; writeRequests(all); }
+  if (req.status !== 'paid') { req.status = 'paid'; writeRequestsSync(all); }
   return req;
 }
 
-// Marks ALL requests sharing a session ID (e.g. combined checkin-extras checkout).
-export function markAllRequestsPaid(stripeSession: string): ExtraRequest[] {
-  const all = readRequests();
+export async function markAllRequestsPaid(stripeSession: string): Promise<ExtraRequest[]> {
+  if (tursoDb()) return tursoMarkPaid(stripeSession, true) as Promise<ExtraRequest[]>;
+  const all = readRequestsSync();
   const matched = all.filter((r) => r.stripeSession === stripeSession);
   let changed = false;
   for (const req of matched) {
     if (req.status !== 'paid') { req.status = 'paid'; changed = true; }
   }
-  if (changed) writeRequests(all);
+  if (changed) writeRequestsSync(all);
   return matched;
 }
 
-export function requestsForBooking(ref: string): ExtraRequest[] {
-  return readRequests().filter((r) => r.ref.toLowerCase() === ref.toLowerCase() && r.status !== 'pending-payment');
+export async function requestsForBooking(ref: string): Promise<ExtraRequest[]> {
+  if (tursoDb()) return tursoRequestsForBooking(ref);
+  return readRequestsSync().filter((r) => r.ref.toLowerCase() === ref.toLowerCase() && r.status !== 'pending-payment');
 }

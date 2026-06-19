@@ -18,7 +18,7 @@ export default async function ExtraPaidPage({
     const stripe = new Stripe(stripeKey);
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      if (session.payment_status === 'paid') markRequestPaid(sessionId);
+      if (session.payment_status === 'paid') await markRequestPaid(sessionId);
     } catch { /* fall through */ }
   }
 
