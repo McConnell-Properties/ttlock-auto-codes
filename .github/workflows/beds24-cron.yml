@@ -25,7 +25,7 @@ jobs:
 
   pull:
     name: Pull from Beds24
-    needs: push
+    # Intentionally NOT gated on push — inbound bookings must land even if push fails.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,6 +42,7 @@ jobs:
 
   sync-bookings:
     name: Sync bookings hub↔Beds24
+    # Runs after pull so the hub has the latest inbound bookings before syncing out.
     needs: pull
     runs-on: ubuntu-latest
     timeout-minutes: 5
