@@ -15,6 +15,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === '/login' ||
     pathname === '/api/stripe/webhook' ||
+    pathname === '/api/beds24/webhook' ||
     pathname.startsWith('/api/beds24/cron/')
   ) {
     return NextResponse.next();
