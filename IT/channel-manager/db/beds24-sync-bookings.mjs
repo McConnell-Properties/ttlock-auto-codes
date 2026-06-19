@@ -72,8 +72,24 @@ let _b24TokenExp = 0;
 
 async function getB24Token() {
   if (_b24Token && _b24TokenExp - Date.now() > 5 * 60 * 1000) return _b24Token;
+
+  // Try the Turso-cached token first (written by the CM's beds24.ts token manager)
+  try {
+    const r = await db.execute("SELECT value FROM Setting WHERE key = 'beds24_token'");
+    if (r.rows.length) {
+      const cached = JSON.parse(String(r.rows[0].value));
+      if (cached.token && cached.expiresAt - Date.now() > 5 * 60 * 1000) {
+        _b24Token = cached.token;
+        _b24TokenExp = cached.expiresAt;
+        console.log('  [b24] Using Turso-cached token (expires in',
+          Math.round((cached.expiresAt - Date.now()) / 60000), 'min)');
+        return _b24Token;
+      }
+    }
+  } catch { /* fall through to refresh */ }
+
   const refreshTok = process.env.BEDS24_REFRESH_TOKEN;
-  if (!refreshTok) throw new Error('BEDS24_REFRESH_TOKEN not set');
+  if (!refreshTok) throw new Error('BEDS24_REFRESH_TOKEN not set (and no valid Turso-cached token)');
   const res = await fetch(`${B24_BASE}/authentication/token`, {
     headers: { refreshToken: refreshTok },
   });
